@@ -1,5 +1,5 @@
 """
-run_tests.py  (ver3 - 2026.10.05, 마친 기록 수정·백업 병합 검사 추가)
+run_tests.py  (ver2 - 2026.09.30, 스크롤 유지·해설 작성 검사 추가)
 dist/ 웹앱을 실제 브라우저(Chromium)로 열어 핵심 흐름을 검사한다.
 빌드 후, 템플릿이나 build.py 를 고친 뒤에 실행한다.
 
@@ -130,20 +130,6 @@ async def main():
         out = await pg.input_value("#out")
         check("기록 텍스트에 B·D 항목", "B |" in out and "D |" in out)
         check("연습 기록에 시간 줄 없음", "시간" not in out.splitlines()[1])
-        # 3-1a. 마친 기록 수정 (2026-10-05): 답은 고정, 반응·1줄 기록만 고친다
-        await pg.click("button:has-text('기록 수정')")
-        check("기록 수정: 답 버튼 잠김", await pg.locator(".bub:enabled").count() == 0)
-        check("기록 수정: 푼 문항만 이동", "1 / 2" in await pg.inner_text(".progress-text"))
-        await pg.click("#nextBtn")
-        check("기록 수정: 오답은 C·D만 활성", await pg.is_enabled('.rxb[data-k="C"]') and await pg.is_disabled('.rxb[data-k="B"]'))
-        await pg.click('.rxb[data-k="C"]')
-        await pg.fill("#note", "수정한 근거")
-        await pg.click("#nextBtn")                                  # 마지막 문항 → 수정 마치기
-        await pg.wait_for_timeout(300)
-        out = await pg.input_value("#out")
-        check("수정 후 기록 텍스트 반영", "C |" in out and "수정한 근거" in out and "D |" not in out, out[-200:])
-        sess = await pg.evaluate("JSON.parse(localStorage.getItem('hkh.sessions.v1'))")
-        check("수정한 기록 저장(updatedAt)", any(x.get("finished") and x.get("updatedAt") and x["items"]["2"]["rx"] == "C" for x in sess))
 
         # 3-2. 해설 파일 받기
         await pg.click("text=처음으로")
@@ -155,18 +141,6 @@ async def main():
         data = _j.loads(open(await d.path(), encoding="utf-8").read())
         check("해설 파일 형식", data.get("type") == "hkh-explanations" and len(data["items"]) == 1
               and data["items"][0]["n"] == 1, str(data)[:120])
-        # 3-3. 백업 불러오기: 같은 기록은 나중에 고친 쪽을 남김 (2026-10-05)
-        check("기록 목록에 수정 버튼", await pg.locator("table >> text=수정").count() >= 1)
-        import tempfile
-        sid = sess[0]["id"]
-        for note, dt, want in (("백업에서 고침", 60000, "백업에서 고침"), ("옛 기록", -10**12, "백업에서 고침")):
-            x = _j.loads(_j.dumps(sess[0])); x["items"]["2"]["note"] = note; x["updatedAt"] = sess[0]["updatedAt"] + dt
-            fp = os.path.join(tempfile.mkdtemp(), "b.json")
-            open(fp, "w", encoding="utf-8").write(_j.dumps([x]))
-            await pg.set_input_files("#restore", fp)
-            await pg.wait_for_timeout(300)
-            got = await pg.evaluate(f"JSON.parse(localStorage.getItem('hkh.sessions.v1')).find(x=>x.id==='{sid}').items['2'].note")
-            check(f"백업 불러오기: {'최신 기록으로 교체' if dt > 0 else '옛 기록은 무시'}", got == want, got)
 
         # 4. 이어하기 저장
         await pg.click("text=80분 실전 시작")
