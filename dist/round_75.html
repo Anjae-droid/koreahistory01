@@ -246,7 +246,7 @@ function renderHome(){
   view="home"; EDIT=null;
   const open = ALL.filter(x=>x.round===ROUND && !x.finished);
   const done = ALL.filter(x=>x.round===ROUND && x.finished);
-  let h = `<div class="bar"><div class="left"><a class="btn ghost" href="index.html">← 회차 선택</a></div></div>` + mast();
+  let h = `<div class="bar"><div class="left"><a class="btn ghost" href="index.html#round">← 회차 선택</a></div></div>` + mast();
   if(!P.length) h += `<div class="warn">data/${ROUND}/data.js 를 읽지 못했습니다. 웹앱_빌드.bat 을 다시 실행하세요.</div>`;
   if(!storageOK) h += `<div class="warn">이 브라우저에서는 기록이 저장되지 않습니다. 세션이 끝나면 반드시 결과 화면에서 기록을 복사해 두세요.</div>`;
   open.forEach(o=>{

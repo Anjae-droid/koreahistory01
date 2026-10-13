@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>한국사능력검정시험 (심화) · 회차별 학습 기록</title>
+<title>한국사능력검정시험 (심화) · 학습 기록</title>
 <style>
 :root{
   --bg:#f5f1ea; --paper:#fefcf7; --ink:#2c2620; --ink-soft:#6b6358;
@@ -31,6 +31,14 @@ header .subtitle{font-size:14px;opacity:0.9}
 .round-card .round-num{font-size:28px;font-weight:700;color:var(--accent);margin:4px 0;letter-spacing:-1px}
 .round-card .round-num small{font-size:15px;color:var(--ink-soft);font-weight:500}
 .round-card .round-date{font-size:12px;color:var(--ink-soft);margin-top:6px}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.pick-card{padding:28px 20px;font:inherit;cursor:pointer;width:100%}
+.pick-card .pick-t{font-size:22px;font-weight:700;color:var(--accent);letter-spacing:-0.5px}
+.pick-card .pick-d{font-size:13px;color:var(--ink-soft);margin-top:6px}
+.era-card .round-num{font-size:22px}
+.bar{margin-bottom:12px}
+.btn.ghost{display:inline-block;background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--ink);text-decoration:none}
+.btn.ghost:hover{background:var(--paper)}
 .warn{background:#fbe9e7;border:1px solid #e8b9b4;color:#b8392e;border-radius:6px;padding:10px 12px;font-size:13px}
 footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);padding:16px}
 @media (max-width:480px){header h1{font-size:18px}.wrap{padding:10px}.round-card{padding:16px}.round-card .round-num{font-size:24px}}
@@ -41,23 +49,54 @@ footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);pa
 <div class="wrap">
   <header>
     <span class="badge">한국사능력검정시험</span>
-    <h1>심화 · 회차별 학습 기록</h1>
+    <h1 id="ttl">심화 · 학습 기록</h1>
     <div class="subtitle" id="sub"></div>
   </header>
-  <div class="round-grid" id="grid"></div>
+  <div id="main"></div>
   <footer>출처 : 국사편찬위원회 · 한국사능력검정시험 (심화)</footer>
 </div>
 <script src="data/rounds.js"></script>
+<script src="data/all.js"></script>
 <script>
 /* 생성물: src/template_index.html 을 build.py 가 복사한 파일입니다. 직접 수정하지 마십시오. */
+/* 첫 화면: 회차별 / 시대별 선택 → #round (회차 목록) · #era (시대 목록). 회차 화면의 "← 회차 선택"은 #round 로 돌아온다. */
 const R = (window.ROUNDS || []).slice().sort((a,b)=>b.round-a.round);
-document.getElementById("sub").textContent = R.map(r=>r.round).join(" · ") + "회";
-document.getElementById("grid").innerHTML = R.length ? R.map(r=>`
+const AP = (window.ALL_DATA || {problems:[]}).problems;
+const ERAS = ["전삼국","삼국","남북국","고려","조선","개항기","일제강점기","해방이후","미분류"];
+const back = `<div class="bar"><a class="btn ghost" href="#">← 처음으로</a></div>`;
+function render(){
+  const v = location.hash.slice(1);
+  const ttl = document.getElementById("ttl"), sub = document.getElementById("sub"), m = document.getElementById("main");
+  if(!R.length){ m.innerHTML = `<div class="warn">data/rounds.js 를 읽지 못했습니다. 웹앱_빌드.bat 을 다시 실행하세요.</div>`; return; }
+  if(v==="round"){
+    ttl.textContent = "심화 · 회차별 학습 기록";
+    sub.textContent = R.map(r=>r.round).join(" · ") + "회";
+    m.innerHTML = back + `<div class="round-grid">` + R.map(r=>`
   <a class="round-card" href="round_${r.round}.html">
     <div class="year">${(r.date||"").slice(0,4)}${r.date?"년":""}</div>
     <div class="round-num">${r.round}<small>회</small></div>
     <div class="round-date">${r.date||""}</div>
-  </a>`).join("") : `<div class="warn">data/rounds.js 를 읽지 못했습니다. 웹앱_빌드.bat 을 다시 실행하세요.</div>`;
+  </a>`).join("") + `</div>`;
+  } else if(v==="era"){
+    ttl.textContent = "심화 · 시대별 학습 기록";
+    sub.textContent = `${R[R.length-1].round}~${R[0].round}회 · ${AP.length}문항`;
+    m.innerHTML = back + (AP.length ? `<div class="round-grid">` + ERAS.map(e=>{ const c=AP.filter(p=>p.e===e).length; return c ? `
+  <a class="round-card era-card" href="era.html#${encodeURIComponent(e)}">
+    <div class="round-num">${e}</div>
+    <div class="round-date">${c}문항</div>
+  </a>` : ""; }).join("") + `</div>` : `<div class="warn">data/all.js 를 읽지 못했습니다. 웹앱_빌드.bat 을 다시 실행하세요.</div>`);
+  } else {
+    ttl.textContent = "심화 · 학습 기록";
+    sub.textContent = `${R[R.length-1].round}~${R[0].round}회 기출`;
+    m.innerHTML = `<div class="pick-grid">
+  <a class="round-card pick-card" href="#round"><div class="pick-t">회차별로 풀기</div><div class="pick-d">회차 하나를 연습·실전(80분)으로 풉니다.</div></a>
+  <a class="round-card pick-card" href="#era"><div class="pick-t">시대별로 풀기</div><div class="pick-d">한 시대 문항만 모아 풉니다. 시간 제한 없음.</div></a>
+</div>`;
+  }
+  window.scrollTo(0,0);
+}
+window.addEventListener("hashchange", render);
+render();
 </script>
 </body>
 </html>

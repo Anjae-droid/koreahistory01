@@ -1,5 +1,5 @@
 """
-build.py  (ver1 - 2026.09.28)
+build.py  (ver2 - 2026.10.13, 시대별 풀이용 all.js·era.html 추가)
 data/ 의 회차별 문항.csv·이미지를 읽어 dist/ 에 웹앱을 생성한다.
 
   data/rounds.csv            회차,시행일
@@ -87,7 +87,8 @@ def main():
     tpl_index = open(os.path.join(SRC, "template_index.html"), encoding="utf-8").read()
     os.makedirs(os.path.join(DIST, "data"), exist_ok=True)
 
-    built, failed = [], []
+    tpl_era = open(os.path.join(SRC, "template_era.html"), encoding="utf-8").read()
+    built, failed, every = [], [], []
     for row in rounds:
         r = int(row["회차"])
         date = (row.get("시행일") or "").strip()
@@ -109,11 +110,19 @@ def main():
         n_exp = sum(1 for p in probs if p["x"])
         print(f"  {r}회: 50문항 / 해설 {n_exp}개 / 이미지 {copied}개 갱신")
         built.append({"round": r, "date": date})
+        every += [dict(p, r=r) for p in probs]
 
     with open(os.path.join(DIST, "data", "rounds.js"), "w", encoding="utf-8") as f:
         f.write("window.ROUNDS = " + json.dumps(built, ensure_ascii=False) + ";\n")
     with open(os.path.join(DIST, "index.html"), "w", encoding="utf-8") as f:
         f.write(tpl_index)
+    # 시대별 풀이: 전 회차 문항을 한 파일로 (회차별 data.js 는 window.ROUND_DATA 하나만 담으므로 같이 못 읽음)
+    with open(os.path.join(DIST, "data", "all.js"), "w", encoding="utf-8") as f:
+        f.write("window.ALL_DATA = " + json.dumps({"rounds": built, "problems": every}, ensure_ascii=False) + ";\n")
+    with open(os.path.join(DIST, "era.html"), "w", encoding="utf-8") as f:
+        f.write(tpl_era)
+    cnt = {e: sum(1 for p in every if p["e"] == e) for e in ERAS}
+    print("  시대별: " + ", ".join(f"{e} {c}" for e, c in cnt.items()))
 
     print(f"\n완료: {len(built)}개 회차 생성" + (f" / 실패: {failed}" if failed else ""))
     print(f"열기: {os.path.join(DIST, 'index.html')}")
