@@ -1,5 +1,5 @@
 """
-run_tests.py  (ver3 - 2026.10.05, 마친 기록 수정·백업 병합 검사 추가)
+run_tests.py  (ver4 - 2026.10.13, 첫 화면(회차별/시대별)·시대별 풀이 검사 추가)
 dist/ 웹앱을 실제 브라우저(Chromium)로 열어 핵심 흐름을 검사한다.
 빌드 후, 템플릿이나 build.py 를 고친 뒤에 실행한다.
 
@@ -68,8 +68,10 @@ async def main():
         pg.on("pageerror", lambda e: errs.append(str(e)))
         pg.on("dialog", lambda d: asyncio.ensure_future(d.accept()))
 
-        # 1. 인덱스
+        # 1. 인덱스: 첫 화면에서 회차별 / 시대별 선택 (2026-10-13)
         await pg.goto(url("index.html"))
+        check("첫 화면에 회차별·시대별 선택", await pg.locator(".pick-card").count() == 2)
+        await pg.click("text=회차별로 풀기")
         cards = await pg.locator(".round-card").count()
         check("인덱스에 회차 카드 표시", cards > 0, f"{cards}개")
         first = await pg.locator(".round-card").first.get_attribute("href")
@@ -188,10 +190,79 @@ async def main():
         await pg.wait_for_timeout(300)
         check("제출 후 번호판 표시", await pg.locator(".sheet .cell").count() == 50)
 
+        await era_tests(b, pg)
+
         check("스크립트 오류 없음", not errs, "; ".join(errs))
         await b.close()
     print(f"\n{sum(results)}/{len(results)} 통과")
     return 0 if all(results) else 1
+
+
+async def era_tests(b, pg):
+    """시대별 풀이 (2026-10-13): 기본 범위 = 최신 회차의 그 시대 문항, 그냥 풀기 / 항목체크 풀기, 시간 제한 없음."""
+    await pg.goto(url("index.html"))
+    await pg.click("text=시대별로 풀기")
+    await pg.wait_for_selector(".era-card")
+    eras = await pg.locator(".era-card").count()
+    check("시대 카드 표시", eras >= 8, f"{eras}개")
+    await pg.click(".era-card >> text=조선")
+    await pg.wait_for_load_state()
+    check("시대 화면 열림", "조선" in await pg.inner_text("header"))
+    exp = await pg.evaluate("EP.filter(p=>p.r===EROUNDS[0]).length")
+    check("기본 범위: 최신 회차의 조선 문항", await pg.input_value("#scope") == str(await pg.evaluate("EROUNDS[0]"))
+          and f"{exp}문항" in await pg.inner_text("#howmany"))
+    check("시대별 화면에 시계 없음", await pg.locator("#clock").count() == 0)
+    # 그냥 풀기: 반응 없이 다음으로, 중간에 그만두면 거기까지 점수
+    await pg.click("text=그냥 풀기 시작")
+    check("문항 출처(회차·번호) 표시", "회" in await pg.inner_text(".qsrc"))
+    a = await pg.evaluate("BY[S.list[0]].a")
+    await pg.click(f".bub >> nth={a - 1}")
+    check("그냥 풀기: 반응 분류 없음", await pg.locator(".rxb").count() == 0)
+    check("그냥 풀기: 해설 표시", await pg.locator(".exp-box").count() == 1)
+    check("그냥 풀기: 바로 다음 문제 가능", await pg.is_enabled("#nextBtn"))
+    await pg.click("#nextBtn")
+    await pg.click("text=그만하기")
+    await pg.wait_for_timeout(300)
+    out = await pg.input_value("#out")
+    check("그냥 풀기: 중간 종료 점수", "정답 1/1문항" in out and "시대: 조선" in out, out[:200])
+    sess = await pg.evaluate("JSON.parse(localStorage.getItem('hkh.sessions.v1')).filter(x=>x.kind==='era')")
+    check("시대별 기록 저장", len(sess) == 1 and sess[0]["finished"])
+    # 항목체크 풀기: 전체 회차·무작위·최대 5문항, 반응·1줄 기록 필수
+    await pg.click("text=처음으로")
+    await pg.select_option("#scope", "all")
+    await pg.select_option("#order", "rand")
+    await pg.select_option("#count", "5")
+    check("문항 수 제한 표시", "5문항" in await pg.inner_text("#howmany"))
+    await pg.click("text=항목체크 풀기 시작")
+    lst = await pg.evaluate("S.list")
+    check("문항 수 제한·전 회차 범위", len(lst) == 5 and await pg.evaluate("S.list.every(k=>BY[k].e==='조선')"), str(lst))
+    await pg.set_viewport_size({"width": 420, "height": 500})
+    await pg.wait_for_function("(()=>{const i=document.querySelector('.qimg img');return !!i && i.complete && i.naturalWidth>0})()", timeout=5000)
+    await pg.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    y1 = await pg.evaluate("window.scrollY")
+    a = await pg.evaluate("BY[S.list[0]].a")
+    await pg.click(f".bub >> nth={a % 5}")                      # 일부러 오답
+    await pg.click('.rxb[data-k="C"]')
+    y2 = await pg.evaluate("window.scrollY")
+    check("항목체크: 반응 선택 후 스크롤 유지", y1 > 0 and y2 > 0, f"전 {y1} / 후 {y2}")
+    await pg.set_viewport_size({"width": 420, "height": 900})
+    check("항목체크: 1줄 기록 전 다음 막힘", await pg.is_disabled("#nextBtn"))
+    await pg.fill("#note", "시대별 근거")
+    check("항목체크: 1줄 기록 후 다음 가능", await pg.is_enabled("#nextBtn"))
+    await pg.reload()
+    check("시대별 이어서 풀기 표시", await pg.locator("text=이어서 풀기").count() == 1)
+    await pg.click("text=이어서 풀기")
+    await pg.click("text=그만하기")
+    await pg.wait_for_timeout(300)
+    out = await pg.input_value("#out")
+    check("항목체크 기록 텍스트", f"C | {lst[0]} / 조선" in out and "시대별 근거" in out and "무작위" in out, out[:300])
+    # 회차 화면에는 시대별 기록이 섞이지 않음
+    r0 = lst[0].split("-")[0]
+    await pg.goto(url(f"round_{r0}.html"))
+    check("회차 화면에 시대별 기록 섞이지 않음", "이 회차 기록 (" not in await pg.inner_text("#app")
+          or await pg.evaluate(f"ALL.filter(x=>x.round==={r0}).length") == await pg.locator("tbody tr").count())
+    await pg.click("text=← 회차 선택")
+    check("회차 화면 → 회차 목록으로 복귀", await pg.locator(".round-card").count() > 2)
 
 
 if __name__ == "__main__":

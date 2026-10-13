@@ -23,7 +23,8 @@ python -m playwright install chromium      (테스트용. 설치가 안 되면 P
 ├ 해설_추가.bat                 화면에서 작성한 해설(JSON)·해설 PDF 반영 → 빌드
 ├ src\
 │  ├ template_round.html        회차 풀이 화면 (디자인은 여기서만)
-│  ├ template_index.html        회차 선택 화면
+│  ├ template_index.html        첫 화면 (회차별/시대별 선택)
+│  ├ template_era.html          시대별 풀이 화면
 │  ├ build.py
 │  ├ extract_pdf.py
 │  ├ import_explanations.py
@@ -37,6 +38,17 @@ python -m playwright install chromium      (테스트용. 설치가 안 되면 P
 ├ _test\run_tests.py
 └ _archive\
 ```
+
+## 시대별로 풀기 (ver5)
+
+첫 화면에서 "시대별로 풀기" → 시대를 고른다.
+
+- **범위**: 기본은 한 회차(최신 회차)의 그 시대 문항만. "전체 회차" 로 바꾸면 65~79회 전체에서 모은다.
+- **순서**: 회차·번호순 / 무작위.  **문항 수**: 전부 / 최대 5·10·20·30·50문항.
+  마지막으로 고른 설정은 다음에 열 때 그대로 남는다.
+- **그냥 풀기**: 답을 고르면 바로 채점·해설. 중간에 "그만하기" 를 누르면 거기까지의 점수·정답률을 보여 준다.
+- **항목체크 풀기**: 회차 연습 모드와 같이 A~D 반응과 1줄 기록을 남긴다. 마친 뒤 "기록 수정" 가능.
+- 시간 제한 없음. 기록은 회차 기록과 같은 백업 파일에 함께 들어간다.
 
 ## 새 시험지 추가
 
