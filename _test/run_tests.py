@@ -1,5 +1,5 @@
 """
-run_tests.py  (ver5 - 2026.10.14, 1줄 기록 선택화·여러 시대 선택 검사)
+run_tests.py  (ver5.2 - 2026.10.14, 시대별 결과 화면 한번에 기록 검사 추가)
 dist/ 웹앱을 실제 브라우저(Chromium)로 열어 핵심 흐름을 검사한다.
 빌드 후, 템플릿이나 build.py 를 고친 뒤에 실행한다.
 
@@ -233,6 +233,18 @@ async def era_tests(b, pg):
     out = await pg.input_value("#out")
     check("그냥 풀기: 중간 종료 점수", "정답 1/2문항" in out and "시대: 조선" in out, out[:200])
     check("그냥 풀기: 반응 없는 오답·메모 기록", "- | " in out and "오답 근거" in out and "그냥 메모" in out, out)
+    # 한번에 기록 (2026-10-14): 결과 화면에서 푼 문항 전체의 반응·1줄 기록을 바로 저장
+    check("한번에 기록 목록", await pg.locator(".bk").count() == 2)
+    k2 = await pg.evaluate("BK.list[1]")
+    await pg.click(f'.bk[data-k="{k2}"] .rxb[data-k="D"]')
+    await pg.fill(f'.bk[data-k="{k2}"] .note', "한번에 쓴 키워드")
+    await pg.wait_for_timeout(600)
+    out = await pg.input_value("#out")
+    check("한번에 기록: 기록 텍스트 즉시 반영", f"D | {k2}" in out and "한번에 쓴 키워드" in out, out)
+    saved = await pg.evaluate(f"JSON.parse(localStorage.getItem('hkh.sessions.v1')).find(x=>x.kind==='era').items['{k2}']")
+    check("한번에 기록: 저장됨", saved.get("rx") == "D" and saved.get("note") == "한번에 쓴 키워드", str(saved))
+    await pg.click(f'.bk[data-k="{k2}"] .rxb[data-k="D"]')
+    check("한번에 기록: 같은 반응 다시 누르면 해제", f"D | {k2}" not in await pg.input_value("#out"))
     sess = await pg.evaluate("JSON.parse(localStorage.getItem('hkh.sessions.v1')).filter(x=>x.kind==='era')")
     check("시대별 기록 저장", len(sess) == 1 and sess[0]["finished"])
     # 항목체크 풀기: 전체 회차·무작위·최대 5문항, 반응·1줄 기록 필수
