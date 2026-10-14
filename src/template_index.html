@@ -36,9 +36,20 @@ header .subtitle{font-size:14px;opacity:0.9}
 .pick-card .pick-t{font-size:22px;font-weight:700;color:var(--accent);letter-spacing:-0.5px}
 .pick-card .pick-d{font-size:13px;color:var(--ink-soft);margin-top:6px}
 .era-card .round-num{font-size:22px}
+button.era-card{width:100%;font:inherit;cursor:pointer}
+.era-card.on{border-color:var(--accent);background:#fbf6ec}
+.era-card .chk{position:absolute;top:10px;right:12px;width:22px;height:22px;border:1.5px solid var(--line);border-radius:50%;
+  font-size:13px;line-height:19px;color:transparent;background:#fff}
+.era-card.on .chk{background:var(--accent);border-color:var(--accent);color:#fefcf7}
+.era-go{position:sticky;bottom:0;padding:12px 0;margin-top:4px;background:linear-gradient(180deg,rgba(245,241,234,0) 0%,var(--bg) 30%)}
+.era-go button{width:100%;background:var(--accent);color:#fefcf7;border:1px solid var(--accent);border-radius:8px;padding:14px;
+  font:inherit;font-size:15px;font-weight:700;cursor:pointer;box-shadow:var(--shadow)}
+.era-go button:disabled{opacity:.4;cursor:not-allowed}
+.era-go button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .bar{margin-bottom:12px}
 .btn.ghost{display:inline-block;background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--ink);text-decoration:none}
 .btn.ghost:hover{background:var(--paper)}
+.hint{font-size:13px;color:var(--ink-soft);margin:0 2px 10px}
 .warn{background:#fbe9e7;border:1px solid #e8b9b4;color:#b8392e;border-radius:6px;padding:10px 12px;font-size:13px}
 footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);padding:16px}
 @media (max-width:480px){header h1{font-size:18px}.wrap{padding:10px}.round-card{padding:16px}.round-card .round-num{font-size:24px}}
@@ -80,21 +91,39 @@ function render(){
   } else if(v==="era"){
     ttl.textContent = "심화 · 시대별 학습 기록";
     sub.textContent = `${R[R.length-1].round}~${R[0].round}회 · ${AP.length}문항`;
-    m.innerHTML = back + (AP.length ? `<div class="round-grid">` + ERAS.map(e=>{ const c=AP.filter(p=>p.e===e).length; return c ? `
-  <a class="round-card era-card" href="era.html#${encodeURIComponent(e)}">
+    m.innerHTML = back + (AP.length ? `<p class="hint">풀 시대를 하나 이상 고르세요. 여러 시대를 함께 고를 수 있습니다.</p><div class="round-grid">` + ERAS.map(e=>{ const c=AP.filter(p=>p.e===e).length; return c ? `
+  <button class="round-card era-card${SELE.includes(e)?" on":""}" data-e="${e}" aria-pressed="${SELE.includes(e)}" onclick="toggleEra('${e}')">
+    <span class="chk">✓</span>
     <div class="round-num">${e}</div>
     <div class="round-date">${c}문항</div>
-  </a>` : ""; }).join("") + `</div>` : `<div class="warn">data/all.js 를 읽지 못했습니다. 웹앱_빌드.bat 을 다시 실행하세요.</div>`);
+  </button>` : ""; }).join("") + `</div><div class="era-go"><button id="eraGo" onclick="goEra()"></button></div>` : `<div class="warn">data/all.js 를 읽지 못했습니다. 웹앱_빌드.bat 을 다시 실행하세요.</div>`);
+    updEra();
   } else {
     ttl.textContent = "심화 · 학습 기록";
     sub.textContent = `${R[R.length-1].round}~${R[0].round}회 기출`;
     m.innerHTML = `<div class="pick-grid">
   <a class="round-card pick-card" href="#round"><div class="pick-t">회차별로 풀기</div><div class="pick-d">회차 하나를 연습·실전(80분)으로 풉니다.</div></a>
-  <a class="round-card pick-card" href="#era"><div class="pick-t">시대별로 풀기</div><div class="pick-d">한 시대 문항만 모아 풉니다. 시간 제한 없음.</div></a>
+  <a class="round-card pick-card" href="#era"><div class="pick-t">시대별로 풀기</div><div class="pick-d">고른 시대(여러 개 가능) 문항만 모아 풉니다. 시간 제한 없음.</div></a>
 </div>`;
   }
   window.scrollTo(0,0);
 }
+/* 시대 여러 개 선택 (2026-10-14): 카드를 눌러 고르고 아래 버튼으로 era.html#조선,개항기 를 연다. 고른 시대는 이 브라우저에 기억. */
+const SELKEY = "hkh.erasel.v1";
+let SELE = (()=>{ try{ const v=JSON.parse(localStorage.getItem(SELKEY)||"[]"); return Array.isArray(v)?v.filter(e=>ERAS.includes(e)):[]; }catch(e){ return []; } })();
+function toggleEra(e){
+  SELE = SELE.includes(e) ? SELE.filter(x=>x!==e) : ERAS.filter(x=>x===e || SELE.includes(x));
+  try{ localStorage.setItem(SELKEY, JSON.stringify(SELE)); }catch(err){}
+  document.querySelectorAll(".era-card").forEach(c=>{ const on=SELE.includes(c.dataset.e); c.classList.toggle("on",on); c.setAttribute("aria-pressed",on); });
+  updEra();
+}
+function updEra(){
+  const b=document.getElementById("eraGo"); if(!b) return;
+  const n=AP.filter(p=>SELE.includes(p.e)).length;
+  b.disabled=!SELE.length;
+  b.textContent = SELE.length ? `${SELE.join("·")} 풀기 (${n}문항)` : "시대를 고르세요";
+}
+function goEra(){ if(SELE.length) location.href = "era.html#" + SELE.map(encodeURIComponent).join(","); }
 window.addEventListener("hashchange", render);
 render();
 </script>

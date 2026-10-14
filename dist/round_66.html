@@ -228,9 +228,8 @@ function qCur(){ return EDIT ? EDIT.cur : S.cur; }
 function item(n){ if(!S.items[n]) S.items[n]={}; return S.items[n]; }
 function graded(n){ return S.mode==="exam" ? S.submitted : !!(S.items[n] && S.items[n].pick); }
 function isRight(n){ const it=S.items[n]; return !!(it && it.pick===BY[n].a); }
-function needsNote(n){ const it=S.items[n]||{}; return it.rx && it.rx!=="A"; }
-function complete(n){ const it=S.items[n]||{}; if(!it.rx) return false; return it.rx==="A" || !!(it.note||"").trim(); }
-function missingMsg(n){ const it=S.items[n]||{}; if(!it.rx) return "문항 반응을 먼저 고르세요."; if(needsNote(n) && !(it.note||"").trim()) return "B·C·D는 1줄 기록이 필수입니다."; return ""; }
+function complete(n){ const it=S.items[n]||{}; return !!it.rx; }   // 1줄 기록은 모든 반응에서 선택 (2026-10-14, 이전: B·C·D 필수)
+function missingMsg(n){ const it=S.items[n]||{}; return it.rx ? "" : "문항 반응을 먼저 고르세요."; }
 
 /* ---------- 시계 (실전 전용) ---------- */
 setInterval(()=>{
@@ -353,7 +352,7 @@ function panel(n){
   const rx = Object.keys(RX).map(k=>`<button class="rxb ${it.rx===k?'on':''}" data-k="${k}" ${allowed.includes(k)?"":"disabled"} onclick="setRx(${n},'${k}')"><b>${k}</b><small>${RXS[k]}</small></button>`).join("");
   const my = it.pick ? CIR[it.pick] : "미응답";
   const label = it.rx==="D" ? "정답 선지의 핵심 키워드" : "두 선지를 구분하는 근거";
-  const req = it.rx ? (it.rx==="A" ? "선택" : "필수") : "";
+  const req = it.rx ? "선택" : "";
   const ph = it.rx==="D" ? "예: 광평성 → 궁예(태봉)의 정치 기구" : it.rx==="A" ? "남길 메모가 있으면 적으세요 (생략 가능)" : "예: 원종·애노의 난은 진성여왕 때, 김헌창의 난은 헌덕왕 때";
   return `<div class="panel">${verdict}
     <div class="sec"><div class="sec-t">문항 반응<em class="${it.rx?'done':''}">${it.rx?it.rx+" 선택":"선택 필요"}</em></div><div class="rx">${rx}</div></div>
@@ -381,7 +380,7 @@ function sheet(){
     else if(it.pick) c+=" filled";
     if(idx===qCur()) c+=" cur";
     return `<button class="${c}" onclick="jump(${idx})"><b>${n}</b>${it.pick?CIR[it.pick]:"&nbsp;"}</button>`;
-  }).join("") + `</div>` + (done?`<p class="muted" style="margin-top:6px">• 표시는 아직 반응 분류나 1줄 기록이 남은 문항입니다.</p>`:"");
+  }).join("") + `</div>` + (done?`<p class="muted" style="margin-top:6px">• 표시는 아직 반응 분류가 남은 문항입니다.</p>`:"");
 }
 
 /* ---------- 동작 ---------- */
@@ -416,7 +415,7 @@ function submitExam(auto){
 function finishPractice(){ if(!complete(nums(S)[S.cur])) return; S.finished=true; S.endedAt=Date.now(); persist(); renderResult(S); }
 function finishReview(){
   const left=nums(S).filter(n=>!complete(n)).length;
-  if(left && !confirm(`기록이 남은 문항이 ${left}개입니다. 그래도 마칠까요?`)) return;
+  if(left && !confirm(`반응 분류가 남은 문항이 ${left}개입니다. 그래도 마칠까요?`)) return;
   S.finished=true; S.endedAt=Date.now(); persist(); renderResult(S);
 }
 function quitEarly(){
@@ -424,7 +423,7 @@ function quitEarly(){
   const answered=nums(S).filter(n=>S.items[n]&&S.items[n].pick).length;
   if(!answered){ if(confirm("아직 푼 문항이 없습니다. 이 기록을 지울까요?")){ ALL=ALL.filter(x=>x.id!==S.id); saveAll(ALL); S=null; renderHome(); } return; }
   const left=nums(S).filter(n=>S.items[n]&&S.items[n].pick&&!complete(n)).length;
-  if(!confirm(`${answered}문항까지 푼 것으로 마칩니다.${left?` (기록이 남은 문항 ${left}개)`:""} 결과를 볼까요?`)) return;
+  if(!confirm(`${answered}문항까지 푼 것으로 마칩니다.${left?` (반응 분류가 남은 문항 ${left}개)`:""} 결과를 볼까요?`)) return;
   S.finished=true; S.endedAt=Date.now(); persist(); renderResult(S);
 }
 document.addEventListener("keydown",e=>{
@@ -448,7 +447,7 @@ function stats(s){
     if(it.rx) rx[it.rx]++;
     era[p.e]=era[p.e]||{t:0,r:0}; era[p.e].t++; if(ok) era[p.e].r++;
   });
-  const pending=list.filter(n=>{const it=s.items[n]||{}; return !it.rx || (it.rx!=="A" && !(it.note||"").trim());}).length;
+  const pending=list.filter(n=>!(s.items[n]||{}).rx).length;
   return {list,got,max,right,rx,era,pending};
 }
 
@@ -469,7 +468,7 @@ function renderResult(s){
   }
   h += `</div>`;
   h += `<div class="counts">` + ["A","B","C","D"].map(k=>`<div><b style="color:var(--${k})">${st.rx[k]}</b>${k} ${RX[k]}</div>`).join("") + `</div>`;
-  if(st.pending) h += `<p class="need" style="text-align:left">반응 분류나 1줄 기록이 빠진 문항이 ${st.pending}개 있습니다. "기록 수정"에서 채울 수 있습니다.</p>`;
+  if(st.pending) h += `<p class="need" style="text-align:left">반응 분류가 빠진 문항이 ${st.pending}개 있습니다. "기록 수정"에서 채울 수 있습니다.</p>`;
   h += `<h2>시대별 정답률</h2><div class="tblwrap"><table><thead><tr><th>시대</th><th>정답</th><th>정답률</th></tr></thead><tbody>` +
     ERAS.filter(e=>st.era[e]).map(e=>{const v=st.era[e]; return `<tr><td>${e}</td><td>${v.r}/${v.t}</td><td>${Math.round(v.r/v.t*100)}%</td></tr>`;}).join("") + `</tbody></table></div>`;
   h += `<h2>코치에게 보낼 기록</h2><p class="muted" style="margin-bottom:8px">아래 내용을 복사해서 학습 코치 채팅에 그대로 붙여넣으세요.</p>
