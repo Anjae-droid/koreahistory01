@@ -184,7 +184,8 @@ footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);pa
 /* 생성물: src/template_era.html 을 build.py 가 복사한 파일입니다. 직접 수정하지 마십시오. */
 /* 시대별 풀이 (2026-10-13). 회차 화면(template_round.html)과 같은 기록 저장소를 쓰고, 기록은 kind:"era" 로 구분한다.
    문항 키는 "회차-번호" (예: "79-12"). 시간 제한 없음.
-   모드: plain(그냥 풀기 — 반응 분류·1줄 기록 모두 선택) / check(항목체크 — 반응 분류 필수, 1줄 기록 선택).
+   모드: plain(그냥 풀기 — 반응 분류·1줄 기록 모두 선택) / check(항목체크 — 반응 분류 필수, 1줄 기록 선택)
+        / batch(한번에 풀기 — 회차 실전처럼 채점 없이 끝까지 풀고 제출, 기록은 결과 화면 "한번에 기록"에서. 시간 제한 없음).
    여러 시대 (2026-10-14): era.html#조선,개항기 → 기록에 eras:[...] 저장. 옛 기록은 era:"조선" 하나만 있다. */
 const AD = window.ALL_DATA || {rounds:[], problems:[]};
 const AP = AD.problems;
@@ -200,7 +201,7 @@ function sameSel(s){ return erasOf(s).join(",")===SEL.join(","); }
 const CIR = ["","①","②","③","④","⑤"];
 const RX = {A:"바로 맞음",B:"헷갈렸는데 맞음",C:"두 선지에서 틀림",D:"아예 모름"};
 const RXS = {A:"바로 맞음",B:"헷갈려 맞음",C:"둘 중 틀림",D:"아예 모름"};
-const MODE = {plain:"그냥 풀기", check:"항목체크"};
+const MODE = {plain:"그냥 풀기", check:"항목체크", batch:"한번에 풀기"};
 const KEY = "hkh.sessions.v1";
 const EXKEY = "hkh.exps.v1";      // 풀이 화면에서 작성한 해설 {"회차-번호": {t, at}} — 해설_추가.bat 로 문항.csv 에 반영
 const OPTKEY = "hkh.eraopt.v1";   // 마지막으로 고른 범위·순서·문항 수 (편의용)
@@ -257,11 +258,12 @@ function modeLabel(s){ return `${MODE[s.mode]} · ${scopeLabel(s)} ${s.list.leng
 function qList(){ return EDIT ? EDIT.list : S.list; }
 function qCur(){ return EDIT ? EDIT.cur : S.cur; }
 function item(k){ if(!S.items[k]) S.items[k]={}; return S.items[k]; }
-function graded(k){ return !!(S.items[k] && S.items[k].pick); }
+function live(){ return S.mode==="batch" && !S.submitted && !EDIT; }   // 한번에 풀기 제출 전: 채점·정답 표시 없음
+function graded(k){ return S.mode==="batch" ? !!S.submitted : !!(S.items[k] && S.items[k].pick); }
 function isRight(k){ const it=S.items[k]; return !!(it && it.pick===BY[k].a); }
 function complete(k){ const it=S.items[k]||{}; return !!it.rx; }   // 1줄 기록은 항상 선택 (2026-10-14)
-function canNext(k){ return graded(k) && (S.mode==="plain" || complete(k)); }
-function missingMsg(k){ if(S.mode==="plain") return ""; const it=S.items[k]||{}; return it.rx ? "" : "문항 반응을 먼저 고르세요."; }
+function canNext(k){ return live() || graded(k) && (S.mode!=="check" || complete(k)); }
+function missingMsg(k){ if(S.mode!=="check") return ""; const it=S.items[k]||{}; return it.rx ? "" : "문항 반응을 먼저 고르세요."; }
 
 /* ---------- 화면: 홈 ---------- */
 function curOpt(){
@@ -302,6 +304,8 @@ function renderHome(){
       <div class="btnrow"><button class="btn primary" onclick="start('plain')">그냥 풀기 시작</button></div></div>
     <div class="mode"><h3>항목체크 풀기</h3><p>회차 연습과 같이 문항마다 바로 채점하고, 반응 분류(A~D)를 고른 뒤 넘어갑니다. 1줄 기록은 선택입니다.</p>
       <div class="btnrow"><button class="btn primary" onclick="start('check')">항목체크 풀기 시작</button></div></div>
+    <div class="mode"><h3>한번에 풀기</h3><p>회차 실전처럼 채점 없이 끝까지 풀고 제출합니다. 답은 제출 전까지 바꿀 수 있고, 반응 분류와 1줄 기록은 결과 화면에서 한꺼번에 남깁니다. 시간 제한 없음.</p>
+      <div class="btnrow"><button class="btn primary" onclick="start('batch')">한번에 풀기 시작</button></div></div>
   </div>`;
   const done = mine.filter(x=>x.finished);
   h += `<h2>${SEL.length>1?"이 조합":"이 시대"} 기록 ${done.length ? "("+done.length+")" : ""}</h2>`;
@@ -337,7 +341,7 @@ function start(mode){
   if(!list.length){ toast("고른 범위에 문항이 없습니다."); return; }
   const open = ALL.find(x=>x.kind==="era" && sameSel(x) && !x.finished);
   if(open && !confirm("진행 중인 기록이 있습니다. 새로 시작할까요? (진행 중인 기록은 그대로 남습니다)")) return;
-  S = {id:Date.now().toString(36), kind:"era", era:ERA, eras:SEL.slice(), mode, scope:o.scope, order:o.order, list, startedAt:Date.now(), cur:0, finished:false, items:{}};
+  S = {id:Date.now().toString(36), kind:"era", era:ERA, eras:SEL.slice(), mode, scope:o.scope, order:o.order, list, startedAt:Date.now(), cur:0, submitted:false, finished:false, items:{}};
   EDIT=null; editExp=null; persist(); showSheet=false; renderQuiz();
 }
 function resume(id){ S = ALL.find(x=>x.id===id); EDIT=null; editExp=null; showSheet=false; renderQuiz(); }
@@ -361,26 +365,29 @@ function renderQuiz(keep, after){
   let h = `<div class="bar"><div class="left">
       ${EDIT ? `<button class="btn ghost" onclick="finishEdit()">← 수정 마치기</button>` : `<button class="btn ghost" onclick="quitEarly()">← 그만하기</button>`}
       <span class="tag">${esc(ERA)}</span><span class="tag subtle">${title}</span></div>
-    <div class="right"><span class="progress-text">${cur+1} / ${list.length} · ${rn(k)}</span></div></div>`;
+    <div class="right"><span class="progress-text">${cur+1} / ${list.length} · ${rn(k)}</span>${live()?`<button class="btn primary" style="padding:6px 12px;border-radius:6px" onclick="submitBatch()">제출</button>`:""}</div></div>`;
   h += `<div class="card"><div class="qsrc">제${p.r}회 ${p.n}번 · ${p.e} · ${p.p}점</div><div class="qimg"><img src="data/${p.r}/img/q${String(p.n).padStart(2,"0")}.jpg" alt="${p.r}회 ${p.n}번 문제"></div>`;
   h += `<div class="bubbles">` + [1,2,3,4,5].map(v=>{
     let c="bub"; if(it.pick===v) c+=" picked";
     if(g){ if(v===p.a) c+=" correct"; if(it.pick===v && v!==p.a) c+=" wrong"; }
     return `<button class="${c}" ${g?"disabled":""} onclick="pick('${k}',${v})" aria-label="${v}번 선택">${CIR[v]}</button>`;
   }).join("") + `</div>`;
-  if(!g) h += `<p class="hint">답을 고르면 바로 채점됩니다. 키보드 1~5로도 고를 수 있습니다.</p>`;
+  if(!g) h += `<p class="hint">${live()?"답은 제출 전까지 바꿀 수 있습니다. 키보드 1~5로도 고를 수 있습니다.":"답을 고르면 바로 채점됩니다. 키보드 1~5로도 고를 수 있습니다."}</p>`;
   if(g) h += panel(k);
   h += `</div>`;
   const last = cur===list.length-1;
   if(EDIT){
     h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button><button class="btn" onclick="toggleSheet()">번호판 ${showSheet?'닫기':'보기'}</button>
       <button class="btn primary" id="nextBtn" onclick="${last?'finishEdit()':'go(1)'}">${last?'수정 마치기':'다음'}</button></div><div class="need" id="need">${missingMsg(k)}</div>`;
+  } else if(live()){
+    h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button><button class="btn" onclick="toggleSheet()">답안지 ${showSheet?'닫기':'보기'}</button>
+      <button class="btn primary" id="nextBtn" onclick="${last?'submitBatch()':'go(1)'}">${last?'제출':'다음'}</button></div>`;
   } else {
     h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button>
       <button class="btn primary" id="nextBtn" ${canNext(k)?"":"disabled"} onclick="${last?'finishAll()':'go(1)'}">${last?'결과 보기':'다음 문제'}</button></div>
       <div class="need" id="need">${g?missingMsg(k):""}</div>`;
   }
-  if(EDIT && showSheet) h += sheet();
+  if((EDIT || live()) && showSheet) h += sheet();
   $("#app").innerHTML = h;
   const fin = ()=>{ window.scrollTo(0, keep ? y0 : 0); if(after) after(); };
   fin();
@@ -418,10 +425,11 @@ function sheet(){
   const list=qList();
   return `<div class="sheet">` + list.map((k,idx)=>{
     const it=S.items[k]||{}; let c="cell";
-    c += isRight(k)?" ok":" no"; if(S.mode==="check" && !complete(k)) c+=" pending";
+    if(live()){ if(it.pick) c+=" filled"; }
+    else { c += isRight(k)?" ok":" no"; if(S.mode==="check" && !complete(k)) c+=" pending"; }
     if(idx===qCur()) c+=" cur";
     return `<button class="${c}" onclick="jump(${idx})"><b>${k}</b>${it.pick?CIR[it.pick]:"&nbsp;"}</button>`;
-  }).join("") + `</div><p class="muted" style="margin-top:6px">${S.mode==="check"?"• 표시는 아직 반응 분류가 남은 문항입니다.":"반응 분류·1줄 기록은 선택입니다."}</p>`;
+  }).join("") + `</div><p class="muted" style="margin-top:6px">${live()?"번호를 누르면 그 문항으로 갑니다.":S.mode==="check"?"• 표시는 아직 반응 분류가 남은 문항입니다.":"반응 분류·1줄 기록은 선택입니다."}</p>`;
 }
 
 /* ---------- 동작 ---------- */
@@ -445,10 +453,20 @@ function go(d){
   editExp=null;
   S.cur=Math.min(list.length-1,Math.max(0,S.cur+d)); persist(); renderQuiz();
 }
-function jump(i){ editExp=null; EDIT.cur=i; renderQuiz(); }
+function jump(i){ editExp=null; if(EDIT){ EDIT.cur=i; renderQuiz(); return; } S.cur=i; persist(); renderQuiz(); }
 function toggleSheet(){ showSheet=!showSheet; const y=window.scrollY; renderQuiz(); if(showSheet) document.querySelector(".sheet").scrollIntoView({block:"center"}); else window.scrollTo(0,y); }
 function finishAll(){ if(!canNext(S.list[S.cur])) return; S.finished=true; S.endedAt=Date.now(); persist(); renderResult(S); }
+function submitBatch(){
+  const blank=S.list.filter(k=>!(S.items[k]&&S.items[k].pick)).length;
+  if(!confirm(blank ? `아직 ${blank}문항을 비워 두었습니다. 제출할까요?` : "제출하고 채점할까요?")) return;
+  S.submitted=true; S.finished=true; S.endedAt=Date.now(); S.cur=0; showSheet=false; persist(); renderResult(S);
+  toast("제출했습니다. 아래 \"한번에 기록\"에서 반응과 1줄 기록을 남기세요.");
+}
 function quitEarly(){
+  if(live()){
+    if(!S.list.some(k=>S.items[k]&&S.items[k].pick)){ if(confirm("아직 푼 문항이 없습니다. 이 기록을 지울까요?")){ ALL=ALL.filter(x=>x.id!==S.id); saveAll(ALL); S=null; renderHome(); } return; }
+    submitBatch(); return;
+  }
   const answered=S.list.filter(k=>graded(k)).length;
   if(!answered){ if(confirm("아직 푼 문항이 없습니다. 이 기록을 지울까요?")){ ALL=ALL.filter(x=>x.id!==S.id); saveAll(ALL); S=null; renderHome(); } return; }
   const left=S.mode==="check" ? S.list.filter(k=>graded(k)&&!complete(k)).length : 0;
@@ -460,6 +478,7 @@ document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT") return;
   const k=qList()[qCur()];
   if(/^[1-5]$/.test(e.key) && !graded(k)) pick(k,+e.key);
+  else if(live()){ if(e.key==="ArrowRight") go(1); else if(e.key==="ArrowLeft") go(-1); }
   else if(/^[abcdABCD]$/.test(e.key) && graded(k)){ const x=e.key.toUpperCase(); const ok=isRight(k); if((ok&&"AB".includes(x))||(!ok&&"CD".includes(x))) setRx(k,x); }
   else if(e.key==="ArrowRight"){ if(EDIT||canNext(k)) go(1); }
   else if(e.key==="ArrowLeft") go(-1);
@@ -468,16 +487,16 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden){ persist(
 
 /* ---------- 통계 (푼 문항 기준) ---------- */
 function stats(s){
-  const list = s.list.filter(k=>s.items[k]&&s.items[k].pick&&BY[k]);
+  const list = s.list.filter(k=>BY[k] && ((s.mode==="batch" && s.submitted) || (s.items[k]&&s.items[k].pick)));   // 한번에 풀기는 빈 문항도 오답으로 셈
   let got=0,max=0,right=0; const rx={A:0,B:0,C:0,D:0}; const rnd={}, era={};
   list.forEach(k=>{
-    const p=BY[k], it=s.items[k], ok=it.pick===p.a;
+    const p=BY[k], it=s.items[k]||{}, ok=it.pick===p.a;
     max+=p.p; if(ok){got+=p.p;right++;}
     if(it.rx) rx[it.rx]++;
     rnd[p.r]=rnd[p.r]||{t:0,r:0}; rnd[p.r].t++; if(ok) rnd[p.r].r++;
     era[p.e]=era[p.e]||{t:0,r:0}; era[p.e].t++; if(ok) era[p.e].r++;
   });
-  const pending = s.mode==="check" ? list.filter(k=>!s.items[k].rx).length : 0;
+  const pending = s.mode==="check" ? list.filter(k=>!(s.items[k]||{}).rx).length : 0;
   return {list,got,max,right,rx,rnd,era,pending};
 }
 function pct(st){ return st.list.length?Math.round(st.right/st.list.length*100):0; }
@@ -503,7 +522,7 @@ function renderResult(s){
     rk.map(r=>{const v=st.rnd[r]; return `<tr><td>제${r}회</td><td>${v.r}/${v.t}</td><td>${Math.round(v.r/v.t*100)}%</td></tr>`;}).join("") + `</tbody></table></div>`;
   const wrong = st.list.filter(k=>!isRightIn(s,k));
   if(!check) h += `<h2>틀린 문항 ${wrong.length?"("+wrong.length+")":""}</h2>` + (wrong.length ? `<div class="tblwrap"><table><thead><tr><th>문항</th><th>내 답</th><th>정답</th></tr></thead><tbody>` +
-    wrong.map(k=>`<tr><td>제${BY[k].r}회 ${BY[k].n}번</td><td>${CIR[s.items[k].pick]}</td><td>${CIR[BY[k].a]}</td></tr>`).join("") + `</tbody></table></div>` : `<p class="muted">없습니다.</p>`);
+    wrong.map(k=>`<tr><td>제${BY[k].r}회 ${BY[k].n}번</td><td>${(s.items[k]||{}).pick?CIR[s.items[k].pick]:"미응답"}</td><td>${CIR[BY[k].a]}</td></tr>`).join("") + `</tbody></table></div>` : `<p class="muted">없습니다.</p>`);
   h += bulkBox(s, st);
   h += `<h2>코치에게 보낼 기록</h2><p class="muted" style="margin-bottom:8px">아래 내용을 복사해서 학습 코치 채팅에 그대로 붙여넣으세요.</p>
     <textarea class="out" id="out" readonly>${esc(exportText(s))}</textarea>
@@ -517,8 +536,8 @@ let BK = null;   // 결과 화면에 띄운 기록
 function bulkBox(s, st){
   BK = s;
   const rows = st.list.map(k=>{
-    const p=BY[k], it=s.items[k], ok=it.pick===p.a, allowed = ok ? ["A","B"] : ["C","D"];
-    return `<div class="bk" data-k="${k}"><div class="bk-h"><b>${k}</b><span>${p.e}</span><span>내 답 ${CIR[it.pick]} · 정답 ${CIR[p.a]}</span><span class="${ok?"ok":"no"}">${ok?"✓":"✗"}</span></div>
+    const p=BY[k], it=s.items[k]||{}, ok=it.pick===p.a, allowed = ok ? ["A","B"] : ["C","D"];
+    return `<div class="bk" data-k="${k}"><div class="bk-h"><b>${k}</b><span>${p.e}</span><span>내 답 ${it.pick?CIR[it.pick]:"미응답"} · 정답 ${CIR[p.a]}</span><span class="${ok?"ok":"no"}">${ok?"✓":"✗"}</span></div>
       <div class="bk-row">${allowed.map(x=>`<button class="rxb ${it.rx===x?'on':''}" data-k="${x}" onclick="bulkRx('${k}','${x}',this)"><b>${x}</b><small>${RXS[x]}</small></button>`).join("")}
         <input class="note" type="text" maxlength="160" placeholder="1줄 기록 (선택)" value="${esc(it.note||"")}" oninput="bulkNote('${k}',this.value)"></div>
       <details><summary>문제 보기</summary><img loading="lazy" src="data/${p.r}/img/q${String(p.n).padStart(2,"0")}.jpg" alt="${p.r}회 ${p.n}번 문제"></details></div>`;
@@ -528,11 +547,11 @@ function bulkBox(s, st){
 function bulkSave(){ BK.updatedAt=Date.now(); const i=ALL.findIndex(x=>x.id===BK.id); if(i<0) ALL.push(BK); else ALL[i]=BK; saveAll(ALL); }
 function bulkRefresh(){ const o=$("#out"); if(o) o.value=exportText(BK); const c=$("#counts"); if(c) c.innerHTML=countsHtml(stats(BK)); }
 function bulkRx(k,x,btn){
-  const it=BK.items[k]; it.rx = it.rx===x ? undefined : x; if(!it.rx) delete it.rx;
+  const it=BK.items[k]||(BK.items[k]={}); it.rx = it.rx===x ? undefined : x; if(!it.rx) delete it.rx;
   btn.parentNode.querySelectorAll(".rxb").forEach(b=>b.classList.toggle("on", b.dataset.k===it.rx));
   bulkSave(); bulkRefresh();
 }
-function bulkNote(k,v){ BK.items[k].note=v; clearTimeout(bulkNote._h); bulkNote._h=setTimeout(bulkSave,400); bulkRefresh(); }
+function bulkNote(k,v){ (BK.items[k]||(BK.items[k]={})).note=v; clearTimeout(bulkNote._h); bulkNote._h=setTimeout(bulkSave,400); bulkRefresh(); }
 function isRightIn(s,k){ const it=s.items[k]; return !!(it && it.pick===BY[k].a); }
 function exportText(s){
   const st=stats(s), check=s.mode==="check";
@@ -545,16 +564,17 @@ function exportText(s){
   const rk=Object.keys(st.rnd).map(Number).sort((a,b)=>a-b);
   if(rk.length>1) L.push(`회차별 정답률: ` + rk.map(r=>`${r}회 ${st.rnd[r].r}/${st.rnd[r].t}`).join(", "));
   // 행 양식은 회차 기록과 같다. 그냥 풀기에서 반응을 고르지 않은 문항은 "-" 로 표시한다.
-  const row = (x,k) => { const it=s.items[k], p=BY[k]; return `${x} | ${k} / ${p.e} / 내 답 ${it.pick?CIR[it.pick]:"미응답"}·정답 ${CIR[p.a]} / ${(it.note||"").trim()||"(기록 없음)"}`; };
-  const rows = x => st.list.filter(k=>s.items[k].rx===x).map(k=>row(x,k));
-  const unrxWrong = check ? [] : st.list.filter(k=>!s.items[k].rx && !isRightIn(s,k)).map(k=>row("-",k));
+  const row = (x,k) => { const it=s.items[k]||{}, p=BY[k]; return `${x} | ${k} / ${p.e} / 내 답 ${it.pick?CIR[it.pick]:"미응답"}·정답 ${CIR[p.a]} / ${(it.note||"").trim()||"(기록 없음)"}`; };
+  const rx = k => (s.items[k]||{}).rx;
+  const rows = x => st.list.filter(k=>rx(k)===x).map(k=>row(x,k));
+  const unrxWrong = check ? [] : st.list.filter(k=>!rx(k) && !isRightIn(s,k)).map(k=>row("-",k));
   const wrong=[...rows("C"),...rows("D"),...unrxWrong], confused=rows("B");
   L.push(""); L.push("[오답 1줄 기록]"); L.push(...(wrong.length?wrong:["없음"]));
   L.push(""); L.push("[헷갈렸는데 맞은 문항]"); L.push(...(confused.length?confused:["없음"]));
-  const memo = st.list.filter(k=>{const it=s.items[k]; return (it.rx==="A" || (!check && !it.rx && isRightIn(s,k))) && (it.note||"").trim();})
+  const memo = st.list.filter(k=>{const it=s.items[k]||{}; return (it.rx==="A" || (!check && !it.rx && isRightIn(s,k))) && (it.note||"").trim();})
     .map(k=>`${s.items[k].rx||"-"} | ${k} / ${BY[k].e} / ${s.items[k].note.trim()}`);
   if(memo.length){ L.push(""); L.push("[메모]"); L.push(...memo); }
-  const unrx = st.list.filter(k=>!s.items[k].rx);
+  const unrx = st.list.filter(k=>!rx(k));
   if(check && unrx.length){ L.push(""); L.push(`[반응 미분류] ` + unrx.join(", ")); }
   return L.join("\n");
 }

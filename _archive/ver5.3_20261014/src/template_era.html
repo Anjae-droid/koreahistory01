@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시대별 심화 · 학습 기록</title>
+<style>
+:root{
+  --bg:#f5f1ea; --paper:#fefcf7; --ink:#2c2620; --ink-soft:#6b6358;
+  --accent:#8b1d1d; --accent-dark:#6b1414; --line:#ddd5c7;
+  --correct:#2d6e3f; --wrong:#b8392e;
+  --shadow:0 2px 12px rgba(60,40,20,0.08);
+  --A:#2d6e3f; --B:#a8701a; --C:#b8392e; --D:#6b6358;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",sans-serif;
+  background:var(--bg);color:var(--ink);min-height:100vh;line-height:1.5}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+
+header{background:linear-gradient(180deg,var(--accent) 0%,var(--accent-dark) 100%);color:#fefcf7;
+  padding:22px 16px;text-align:center;margin-bottom:16px;border-radius:8px;box-shadow:var(--shadow)}
+header .badge{display:inline-block;background:rgba(255,255,255,0.15);padding:4px 14px;border-radius:20px;
+  font-size:13px;letter-spacing:1px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.25)}
+header h1{font-size:22px;font-weight:700;margin-bottom:6px;letter-spacing:-0.5px}
+header .subtitle{font-size:14px;opacity:0.9}
+
+h2{font-size:16px;margin:20px 0 10px;color:var(--ink)}
+.muted{color:var(--ink-soft);font-size:13px}
+
+.modes{display:flex;flex-direction:column;gap:10px}
+.mode{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:18px 20px;box-shadow:var(--shadow)}
+.mode h3{font-size:16px;font-weight:700;margin-bottom:2px}
+.mode p{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btn{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:14px;font-weight:600;color:var(--ink);transition:all .2s}
+.btn:hover{opacity:.9}
+a.btn{text-decoration:none;display:inline-block}
+.btn.primary,.btn.omr.primary{background:var(--accent);color:#fefcf7;border-color:var(--accent)}
+.btn.ghost{background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;font-weight:400}
+.btn.ghost:hover{background:var(--bg)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.modes .btnrow .btn{flex:1}
+.resume{background:var(--paper);border:1.5px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:10px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.warn{background:#fbe9e7;border:1px solid #e8b9b4;color:var(--wrong);border-radius:6px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+
+.bar{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);flex-wrap:wrap;gap:8px}
+.bar .left,.bar .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tag{background:var(--accent);color:#fefcf7;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600}
+.tag.subtle{background:var(--bg);color:var(--ink-soft)}
+.progress-text{font-size:13px;color:var(--ink-soft);font-weight:600}
+.clock{font-size:15px;font-weight:700;color:var(--ink)}
+.clock.low{color:var(--wrong)}
+
+.card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px;box-shadow:var(--shadow)}
+.qimg{width:100%;text-align:center;background:#fff;border-radius:6px;overflow:hidden}
+.qimg img{width:100%;height:auto;display:block}
+
+.bubbles{margin-top:14px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.bub{background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:12px 4px;font-size:17px;font-weight:600;color:var(--ink);transition:all .15s}
+.bub:hover:not(:disabled){border-color:var(--accent);background:#fbf6ec}
+.bub:disabled{cursor:default}
+.bub.picked{border-color:var(--accent);background:#fbf6ec}
+.bub.correct{border-color:var(--correct);background:#e8f4ec;color:var(--correct)}
+.bub.picked.wrong{border-color:var(--wrong);background:#fbe9e7;color:var(--wrong)}
+.hint{font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px}
+
+.panel{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.verdict{padding:12px 16px;border-radius:6px;font-size:14px;font-weight:600;text-align:center}
+.verdict.ok{background:#e8f4ec;color:var(--correct);border:1px solid #b8d8c1}
+.verdict.no{background:#fbe9e7;color:var(--wrong);border:1px solid #e8b9b4}
+.verdict span{margin-left:6px;font-weight:600}
+.sec{background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.sec-t{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;justify-content:space-between;gap:8px}
+.sec-t em{font-style:normal;font-weight:600;color:var(--wrong)}
+.sec-t em.done{color:var(--correct)}
+.rx{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.rxb{background:var(--paper);border:1.5px solid var(--line);border-radius:6px;padding:8px 4px;text-align:center;line-height:1.3;transition:all .15s}
+.rxb b{display:block;font-size:17px}
+.rxb small{font-size:11.5px;color:var(--ink-soft);white-space:nowrap}
+.rxb:hover:not(:disabled){border-color:var(--accent)}
+.rxb:disabled{opacity:.3;cursor:not-allowed}
+.rxb.on[data-k="A"]{border-color:var(--A);background:#e8f4ec;color:var(--A)}
+.rxb.on[data-k="B"]{border-color:var(--B);background:#fbf1de;color:var(--B)}
+.rxb.on[data-k="C"]{border-color:var(--C);background:#fbe9e7;color:var(--C)}
+.rxb.on[data-k="D"]{border-color:var(--D);background:var(--bg);color:var(--ink)}
+.meta{font-size:13px;background:var(--bg);border-radius:6px;padding:7px 10px;margin-bottom:8px;color:var(--ink-soft)}
+.meta b{color:var(--accent)}
+.note{width:100%;border:1.5px solid var(--line);border-radius:6px;padding:10px;font:inherit;font-size:14px;background:var(--paper)}
+.note:focus{border-color:var(--accent)}
+.note:disabled{background:var(--bg)}
+.sec.exp-box{background:#fdf6e3;border-color:#e8dcc4}
+.sec.exp-box .sec-t::before{content:'📝';margin-right:6px}
+.sec.exp-box .sec-t{justify-content:flex-start}
+.exp{white-space:pre-wrap;font-size:14px;line-height:1.7}
+.exp.none{color:var(--ink-soft);font-style:italic;font-size:13px}
+.sec.exp-box .sec-t .exp-act{margin-left:auto;display:flex;gap:8px;align-items:center}
+.exp-mine{font-size:11.5px;font-weight:600;color:var(--B);background:#fbf1de;border-radius:10px;padding:1px 8px}
+.exp-edit{width:100%;min-height:150px;border:1.5px solid var(--line);border-radius:6px;padding:10px;font:inherit;font-size:14px;line-height:1.7;background:var(--paper);resize:vertical}
+.exp-edit:focus{border-color:var(--accent);outline:none}
+.exp-btns{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
+.exp-btns .btn{padding:8px 14px;font-size:13px}
+
+.nav{display:flex;gap:8px;margin-top:12px}
+.nav .btn{flex:1;border-radius:6px}
+.need{font-size:12.5px;color:var(--wrong);text-align:right;margin-top:6px;min-height:18px}
+
+.sheet{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px;box-shadow:var(--shadow)}
+.cell{border:1px solid var(--line);border-radius:4px;background:#fff;padding:5px 0;text-align:center;font-size:12px;line-height:1.2}
+.cell b{display:block;font-size:13px}
+.cell.filled{background:#fbf6ec;border-color:var(--accent)}
+.cell.cur{outline:2px solid var(--ink)}
+.cell.ok{background:#e8f4ec;border-color:var(--correct)}
+.cell.no{background:#fbe9e7;border-color:var(--wrong)}
+.cell.pending b::after{content:" •";color:var(--wrong)}
+
+.summary{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:24px;text-align:center;box-shadow:var(--shadow)}
+.summary h2{font-size:20px;margin:0 0 6px;color:var(--accent)}
+.score-circle{width:130px;height:130px;margin:16px auto;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent-dark) 100%);color:#fefcf7;
+  display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-circle .num{font-size:36px;font-weight:700;line-height:1}
+.score-circle .label{font-size:13px;margin-top:4px;opacity:.9}
+.summary-stats{display:flex;justify-content:space-around;margin:16px 0 4px;font-size:14px}
+.summary-stats span{display:block}
+.summary-stats .stat-num{font-size:22px;font-weight:700;margin-bottom:2px}
+.summary-stats .stat-label{color:var(--ink-soft);font-size:12px}
+.ladder{display:flex;margin-top:14px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ladder div{flex:1;text-align:center;padding:6px 2px;font-size:12px;border-right:1px solid var(--line);background:#fff;color:var(--ink-soft)}
+.ladder div:last-child{border-right:0}
+.ladder div.hit{background:var(--accent);color:#fefcf7;font-weight:700}
+.ladder div b{display:block;font-size:14px}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.counts div{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center;font-size:12px;color:var(--ink-soft)}
+.counts b{display:block;font-size:22px}
+table{width:100%;border-collapse:collapse;background:var(--paper);font-size:13px;border-radius:8px;overflow:hidden}
+th,td{border:1px solid var(--line);padding:7px 8px;text-align:center}
+th{background:var(--bg);color:var(--ink-soft);font-weight:600}
+.tblwrap{overflow-x:auto;box-shadow:var(--shadow);border-radius:8px}
+textarea.out{width:100%;min-height:220px;font:inherit;font-size:13px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);white-space:pre}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fefcf7;padding:10px 16px;border-radius:6px;font-size:14px;display:none;z-index:20}
+.toast.show{display:block}
+.linkish{background:none;border:0;color:var(--ink-soft);text-decoration:underline;font-size:13px;padding:2px}
+footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);padding:16px}
+
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.opts label{font-size:12px;color:var(--ink-soft);display:flex;flex-direction:column;gap:4px}
+.opts select{font:inherit;font-size:14px;padding:8px;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
+.opts select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.qsrc{font-size:13px;font-weight:600;color:var(--ink-soft);margin:0 2px 8px}
+.bk{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;box-shadow:var(--shadow)}
+.bk-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);margin-bottom:8px}
+.bk-h b{color:var(--accent)}
+.bk-h .ok{color:var(--correct);font-weight:700}
+.bk-h .no{color:var(--wrong);font-weight:700}
+.bk-row{display:flex;gap:6px;align-items:stretch}
+.bk-row .rxb{flex:0 0 64px;padding:6px 2px}
+.bk-row .rxb b{font-size:15px}
+.bk-row .note{flex:1;min-width:0;padding:8px}
+.bk details{margin-top:8px}
+.bk summary{font-size:12.5px;color:var(--ink-soft);cursor:pointer}
+.bk details img{width:100%;height:auto;display:block;margin-top:6px;border-radius:6px;background:#fff}
+@media (max-width:480px){.opts{grid-template-columns:1fr}}
+@media (max-width:480px){
+  header h1{font-size:18px}
+  .wrap{padding:10px}
+  .bubbles{gap:4px}
+  .bub{padding:10px 2px;font-size:16px}
+  .sheet{grid-template-columns:repeat(5,1fr)}
+  .rxb small{font-size:10.5px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="toast" id="toast"></div>
+<script src="data/all.js"></script>
+<script>
+/* 생성물: src/template_era.html 을 build.py 가 복사한 파일입니다. 직접 수정하지 마십시오. */
+/* 시대별 풀이 (2026-10-13). 회차 화면(template_round.html)과 같은 기록 저장소를 쓰고, 기록은 kind:"era" 로 구분한다.
+   문항 키는 "회차-번호" (예: "79-12"). 시간 제한 없음.
+   모드: plain(그냥 풀기 — 반응 분류·1줄 기록 모두 선택) / check(항목체크 — 반응 분류 필수, 1줄 기록 선택).
+   여러 시대 (2026-10-14): era.html#조선,개항기 → 기록에 eras:[...] 저장. 옛 기록은 era:"조선" 하나만 있다. */
+const AD = window.ALL_DATA || {rounds:[], problems:[]};
+const AP = AD.problems;
+const BY = {}; AP.forEach(p => BY[p.r+"-"+p.n] = p);
+const ERAS = ["전삼국","삼국","남북국","고려","조선","개항기","일제강점기","해방이후","미분류"];
+const SEL = (()=>{ const h=location.hash.slice(1).split(",").map(x=>{ try{ return decodeURIComponent(x); }catch(e){ return ""; } });
+  return ERAS.filter(e=>h.includes(e)); })();                       // 고른 시대 (ERAS 순서)
+const ERA = SEL.join("·");                                          // 화면·기록에 쓰는 이름 (예: 조선·개항기)
+const EP = AP.filter(p=>SEL.includes(p.e)).sort((a,b)=>a.r-b.r||a.n-b.n);   // 고른 시대 문항 (회차·번호순)
+const EROUNDS = [...new Set(EP.map(p=>p.r))].sort((a,b)=>b-a);      // 고른 시대 문항이 있는 회차 (최신순)
+function erasOf(s){ return s.eras || [s.era]; }
+function sameSel(s){ return erasOf(s).join(",")===SEL.join(","); }
+const CIR = ["","①","②","③","④","⑤"];
+const RX = {A:"바로 맞음",B:"헷갈렸는데 맞음",C:"두 선지에서 틀림",D:"아예 모름"};
+const RXS = {A:"바로 맞음",B:"헷갈려 맞음",C:"둘 중 틀림",D:"아예 모름"};
+const MODE = {plain:"그냥 풀기", check:"항목체크"};
+const KEY = "hkh.sessions.v1";
+const EXKEY = "hkh.exps.v1";      // 풀이 화면에서 작성한 해설 {"회차-번호": {t, at}} — 해설_추가.bat 로 문항.csv 에 반영
+const OPTKEY = "hkh.eraopt.v1";   // 마지막으로 고른 범위·순서·문항 수 (편의용)
+const COUNTS = [5,10,20,30,50];
+window.addEventListener("hashchange", ()=>location.reload());
+
+/* ---------- 저장 ---------- */
+let storageOK = true;
+function loadAll(){ try{ const v = localStorage.getItem(KEY); return v ? JSON.parse(v) : []; }catch(e){ storageOK=false; return []; } }
+function saveAll(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){ storageOK=false; } }
+let ALL = loadAll();
+function loadOpt(){ try{ const v=localStorage.getItem(OPTKEY); return v?JSON.parse(v):{}; }catch(e){ return {}; } }
+function saveOpt(o){ try{ localStorage.setItem(OPTKEY, JSON.stringify(o)); }catch(e){} }
+/* ---------- 화면에서 작성한 해설 ---------- */
+function loadExps(){ try{ const v=localStorage.getItem(EXKEY); return v?JSON.parse(v):{}; }catch(e){ return {}; } }
+function saveExps(){ try{ localStorage.setItem(EXKEY, JSON.stringify(EXPS)); }catch(e){ storageOK=false; } }
+let EXPS = loadExps();
+(function(){ let ch=false;             // 이미 문항.csv 에 반영되어 빌드된 해설은 목록에서 지운다
+  Object.keys(EXPS).forEach(k=>{ if(BY[k] && EXPS[k].t.trim()===(BY[k].x||"").trim()){ delete EXPS[k]; ch=true; } });
+  if(ch) saveExps(); })();
+let editExp = null, expDraft = "";
+function expOf(k){ const m=EXPS[k]; return m ? m.t : (BY[k].x||""); }
+function isMine(k){ return !!EXPS[k]; }
+function startExp(k){ editExp=k; expDraft=expOf(k); renderQuiz(true, ()=>{ const t=$("#expEdit"); if(t){ t.focus({preventScroll:true}); t.setSelectionRange(t.value.length,t.value.length); } }); }
+function cancelExp(){ editExp=null; renderQuiz(true); }
+function saveExp(k){
+  const t=expDraft.trim();
+  if(t===(BY[k].x||"").trim()) delete EXPS[k];
+  else EXPS[k]={t, at:Date.now()};
+  saveExps(); editExp=null; renderQuiz(true); toast("해설을 저장했습니다.");
+}
+function revertExp(k){ if(!confirm("작성한 해설을 지우고 원래 해설로 되돌릴까요?")) return; delete EXPS[k]; saveExps(); editExp=null; renderQuiz(true); }
+function exportExps(){
+  const items=Object.entries(EXPS).map(([k,v])=>{ const [r,n]=k.split("-").map(Number); return {round:r,n,text:v.t,updatedAt:v.at}; })
+    .sort((a,b)=>a.round-b.round||a.n-b.n);
+  const blob=new Blob([JSON.stringify({type:"hkh-explanations",version:1,exported:Date.now(),items},null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`한능검_해설_${fmtDate(Date.now()).slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+let S = null;          // 현재 세션
+let view = "home";
+let showSheet = false;
+let EDIT = null;       // 마친 기록 수정 중 {list, cur} — 답은 고정, 반응·1줄 기록만 고친다 (항목체크 기록만)
+function persist(){ if(!S) return; const i = ALL.findIndex(x=>x.id===S.id); if(i<0) ALL.push(S); else ALL[i]=S; saveAll(ALL); }
+
+/* ---------- 유틸 ---------- */
+const $ = s => document.querySelector(s);
+function esc(t){ return String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),1800); }
+function fmtDate(ts){ const d=new Date(ts); const w="일월화수목금토"[d.getDay()]; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}(${w})`; }
+function rn(k){ const p=BY[k]; return p ? `${p.r}회 ${p.n}번` : k; }
+function scopeLabel(s){ return s.scope==="all" ? "전 회차" : `제${s.scope}회`; }
+function modeLabel(s){ return `${MODE[s.mode]} · ${scopeLabel(s)} ${s.list.length}문항${s.order==="rand"?" 무작위":""}`; }
+function qList(){ return EDIT ? EDIT.list : S.list; }
+function qCur(){ return EDIT ? EDIT.cur : S.cur; }
+function item(k){ if(!S.items[k]) S.items[k]={}; return S.items[k]; }
+function graded(k){ return !!(S.items[k] && S.items[k].pick); }
+function isRight(k){ const it=S.items[k]; return !!(it && it.pick===BY[k].a); }
+function complete(k){ const it=S.items[k]||{}; return !!it.rx; }   // 1줄 기록은 항상 선택 (2026-10-14)
+function canNext(k){ return graded(k) && (S.mode==="plain" || complete(k)); }
+function missingMsg(k){ if(S.mode==="plain") return ""; const it=S.items[k]||{}; return it.rx ? "" : "문항 반응을 먼저 고르세요."; }
+
+/* ---------- 화면: 홈 ---------- */
+function curOpt(){
+  const o = loadOpt();
+  let scope = o.scope==="all" ? "all" : +o.scope;
+  if(scope!=="all" && !EROUNDS.includes(scope)) scope = EROUNDS[0];   // 기본: 최신 회차의 이 시대 문항만
+  return {scope, order:o.order==="rand"?"rand":"seq", count:COUNTS.includes(+o.count)?+o.count:"all"};
+}
+function pool(o){ return EP.filter(p=>o.scope==="all" || p.r===o.scope); }
+function readOpt(){
+  const sc=$("#scope").value;
+  const o={scope: sc==="all"?"all":+sc, order:$("#order").value, count: $("#count").value==="all"?"all":+$("#count").value};
+  saveOpt(o); return o;
+}
+function optChanged(){ const o=readOpt(), n=pool(o).length; $("#howmany").textContent = `${o.count==="all"?n:Math.min(n,o.count)}문항을 풉니다.`; }
+function renderHome(){
+  view="home"; EDIT=null; S=null;
+  let h = `<div class="bar"><div class="left"><a class="btn ghost" href="index.html#era">← 시대 선택</a></div></div>` + mast();
+  if(!AP.length){ $("#app").innerHTML = h + `<div class="warn">data/all.js 를 읽지 못했습니다. 웹앱_빌드.bat 을 다시 실행하세요.</div>`; return; }
+  if(!EP.length){ $("#app").innerHTML = h + `<div class="warn">고른 시대 문항이 없습니다. 시대 선택 화면에서 다시 고르세요.</div>`; return; }
+  if(!storageOK) h += `<div class="warn">이 브라우저에서는 기록이 저장되지 않습니다. 세션이 끝나면 반드시 결과 화면에서 기록을 복사해 두세요.</div>`;
+  const mine = ALL.filter(x=>x.kind==="era" && sameSel(x));
+  mine.filter(x=>!x.finished).forEach(o=>{
+    const cnt = o.list.filter(k=>o.items[k]&&o.items[k].pick).length;
+    h += `<div class="resume"><div><b>진행 중: ${modeLabel(o)}</b><div class="muted">${fmtDate(o.startedAt)} 시작 · ${cnt}문항 응답</div></div>
+      <div class="btnrow"><button class="btn primary" onclick="resume('${o.id}')">이어서 풀기</button><button class="btn ghost" onclick="dropSession('${o.id}')">삭제</button></div></div>`;
+  });
+  const o = curOpt();
+  h += `<div class="mode"><h3>범위</h3><p>기본은 한 회차의 ${esc(ERA)} 문항만 풉니다. 전체 회차로 넓히거나 순서·문항 수를 바꿀 수 있습니다.</p>
+    <div class="opts">
+      <label>회차<select id="scope" onchange="optChanged()">${EROUNDS.map(r=>`<option value="${r}" ${o.scope===r?"selected":""}>제${r}회 (${EP.filter(p=>p.r===r).length}문항)</option>`).join("")}
+        <option value="all" ${o.scope==="all"?"selected":""}>전체 회차 (${EP.length}문항)</option></select></label>
+      <label>순서<select id="order" onchange="optChanged()"><option value="seq">회차·번호순</option><option value="rand" ${o.order==="rand"?"selected":""}>무작위</option></select></label>
+      <label>문항 수<select id="count" onchange="optChanged()"><option value="all">전부</option>${COUNTS.map(c=>`<option value="${c}" ${o.count===c?"selected":""}>최대 ${c}문항</option>`).join("")}</select></label>
+    </div><p class="muted" id="howmany" style="margin:0"></p></div>`;
+  h += `<div class="modes" style="margin-top:10px">
+    <div class="mode"><h3>그냥 풀기</h3><p>답을 고르면 바로 채점하고 해설을 보여 줍니다. 반응 분류와 1줄 기록은 남기고 싶을 때만 남깁니다. 중간에 그만두면 거기까지의 점수와 정답률을 봅니다.</p>
+      <div class="btnrow"><button class="btn primary" onclick="start('plain')">그냥 풀기 시작</button></div></div>
+    <div class="mode"><h3>항목체크 풀기</h3><p>회차 연습과 같이 문항마다 바로 채점하고, 반응 분류(A~D)를 고른 뒤 넘어갑니다. 1줄 기록은 선택입니다.</p>
+      <div class="btnrow"><button class="btn primary" onclick="start('check')">항목체크 풀기 시작</button></div></div>
+  </div>`;
+  const done = mine.filter(x=>x.finished);
+  h += `<h2>${SEL.length>1?"이 조합":"이 시대"} 기록 ${done.length ? "("+done.length+")" : ""}</h2>`;
+  h += done.length ? recordsTable(done) : `<p class="muted">아직 끝낸 기록이 없습니다. 위에서 풀기를 시작하세요.</p>`;
+  h += `<h2>백업</h2><p class="muted" style="margin-bottom:8px">기록은 이 기기의 이 브라우저에만 저장됩니다. 회차별·시대별 기록이 한 파일로 함께 백업됩니다.</p>
+    <div class="btnrow"><button class="btn" onclick="backup()">백업 파일 받기</button><button class="btn" onclick="$('#restore').click()">백업 불러오기</button>
+    <input type="file" id="restore" accept=".json" style="display:none" onchange="restore(this)"></div>`;
+  const nAll=Object.keys(EXPS).length;
+  h += `<h2>작성한 해설</h2><p class="muted" style="margin-bottom:8px">${nAll?`반영 전 해설 ${nAll}개`:"반영 전 해설이 없습니다."}</p>
+    <div class="btnrow"><button class="btn" ${nAll?"":"disabled"} onclick="exportExps()">해설 파일 받기</button></div>`;
+  $("#app").innerHTML = h;
+  optChanged();
+  window.scrollTo(0,0);
+}
+function mast(){
+  return `<header><span class="badge">시대별</span><h1>${esc(ERA||"시대 미선택")}</h1><div class="subtitle">심화 · ${AD.rounds.length?`${Math.min(...AD.rounds.map(r=>r.round))}~${Math.max(...AD.rounds.map(r=>r.round))}회 기출 ${EP.length}문항`:""}</div></header>`;
+}
+function recordsTable(list){
+  const rows = list.slice().sort((a,b)=>b.startedAt-a.startedAt).map(s=>{
+    const st=stats(s);
+    return `<tr><td>${fmtDate(s.startedAt).slice(5)}</td><td>${modeLabel(s)}</td><td>${st.got}/${st.max}</td><td>${pct(st)}%</td><td>${st.rx.B}</td><td>${st.rx.C}</td>
+      <td><button class="linkish" onclick="openResult('${s.id}')">보기</button> <button class="linkish" onclick="editRecord('${s.id}')">수정</button> <button class="linkish" onclick="dropSession('${s.id}')">삭제</button></td></tr>`;
+  }).join("");
+  return `<div class="tblwrap"><table><thead><tr><th>날짜</th><th>모드</th><th>점수</th><th>정답률</th><th>B</th><th>C</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ---------- 세션 제어 ---------- */
+function start(mode){
+  const o = readOpt();
+  let list = pool(o).map(p=>p.r+"-"+p.n);
+  if(o.order==="rand") for(let i=list.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
+  if(o.count!=="all") list = list.slice(0, o.count);
+  if(!list.length){ toast("고른 범위에 문항이 없습니다."); return; }
+  const open = ALL.find(x=>x.kind==="era" && sameSel(x) && !x.finished);
+  if(open && !confirm("진행 중인 기록이 있습니다. 새로 시작할까요? (진행 중인 기록은 그대로 남습니다)")) return;
+  S = {id:Date.now().toString(36), kind:"era", era:ERA, eras:SEL.slice(), mode, scope:o.scope, order:o.order, list, startedAt:Date.now(), cur:0, finished:false, items:{}};
+  EDIT=null; editExp=null; persist(); showSheet=false; renderQuiz();
+}
+function resume(id){ S = ALL.find(x=>x.id===id); EDIT=null; editExp=null; showSheet=false; renderQuiz(); }
+function editRecord(id){                 // 마친 기록: 푼 문항의 반응·1줄 기록을 추가·수정
+  const s=ALL.find(x=>x.id===id); if(!s) return;
+  const list=stats(s).list; if(!list.length){ toast("고칠 문항이 없습니다."); return; }
+  S=s; const i=list.findIndex(k=>!complete(k));
+  EDIT={list, cur:Math.max(0,i)}; editExp=null; showSheet=true; renderQuiz();
+}
+function finishEdit(){ persist(); const s=S; renderResult(s); toast("기록을 저장했습니다."); }
+function dropSession(id){ if(!confirm("이 기록을 삭제할까요? 되돌릴 수 없습니다.")) return; ALL=ALL.filter(x=>x.id!==id); saveAll(ALL); if(S&&S.id===id) S=null; renderHome(); }
+
+/* ---------- 화면: 풀이 ---------- */
+function renderQuiz(keep, after){
+  // keep=true: 같은 문항 갱신(답·반응 선택) → 스크롤 유지 / 기본: 문항 이동 → 맨 위
+  const y0 = window.scrollY;
+  view="quiz";
+  const list = qList(), cur = qCur(), k = list[cur], p = BY[k], it = S.items[k]||{};
+  const g = graded(k);
+  const title = EDIT ? `${modeLabel(S)} · 기록 수정` : modeLabel(S);
+  let h = `<div class="bar"><div class="left">
+      ${EDIT ? `<button class="btn ghost" onclick="finishEdit()">← 수정 마치기</button>` : `<button class="btn ghost" onclick="quitEarly()">← 그만하기</button>`}
+      <span class="tag">${esc(ERA)}</span><span class="tag subtle">${title}</span></div>
+    <div class="right"><span class="progress-text">${cur+1} / ${list.length} · ${rn(k)}</span></div></div>`;
+  h += `<div class="card"><div class="qsrc">제${p.r}회 ${p.n}번 · ${p.e} · ${p.p}점</div><div class="qimg"><img src="data/${p.r}/img/q${String(p.n).padStart(2,"0")}.jpg" alt="${p.r}회 ${p.n}번 문제"></div>`;
+  h += `<div class="bubbles">` + [1,2,3,4,5].map(v=>{
+    let c="bub"; if(it.pick===v) c+=" picked";
+    if(g){ if(v===p.a) c+=" correct"; if(it.pick===v && v!==p.a) c+=" wrong"; }
+    return `<button class="${c}" ${g?"disabled":""} onclick="pick('${k}',${v})" aria-label="${v}번 선택">${CIR[v]}</button>`;
+  }).join("") + `</div>`;
+  if(!g) h += `<p class="hint">답을 고르면 바로 채점됩니다. 키보드 1~5로도 고를 수 있습니다.</p>`;
+  if(g) h += panel(k);
+  h += `</div>`;
+  const last = cur===list.length-1;
+  if(EDIT){
+    h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button><button class="btn" onclick="toggleSheet()">번호판 ${showSheet?'닫기':'보기'}</button>
+      <button class="btn primary" id="nextBtn" onclick="${last?'finishEdit()':'go(1)'}">${last?'수정 마치기':'다음'}</button></div><div class="need" id="need">${missingMsg(k)}</div>`;
+  } else {
+    h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button>
+      <button class="btn primary" id="nextBtn" ${canNext(k)?"":"disabled"} onclick="${last?'finishAll()':'go(1)'}">${last?'결과 보기':'다음 문제'}</button></div>
+      <div class="need" id="need">${g?missingMsg(k):""}</div>`;
+  }
+  if(EDIT && showSheet) h += sheet();
+  $("#app").innerHTML = h;
+  const fin = ()=>{ window.scrollTo(0, keep ? y0 : 0); if(after) after(); };
+  fin();
+  if(keep){ const im=document.querySelector(".qimg img"); if(im && !im.complete) im.addEventListener("load", fin, {once:true}); }
+}
+function panel(k){
+  const p=BY[k], it=S.items[k]||{}, ok=isRight(k);
+  const verdict = ok ? `<div class="verdict ok">✓ 정답입니다!<span>(배점 ${p.p}점)</span></div>`
+    : `<div class="verdict no">✗ ${it.pick?"오답입니다.":"미응답입니다."}<span>정답은 ${CIR[p.a]}번입니다.</span></div>`;
+  const allowed = ok ? ["A","B"] : ["C","D"];
+  const rx = Object.keys(RX).map(x=>`<button class="rxb ${it.rx===x?'on':''}" data-k="${x}" ${allowed.includes(x)?"":"disabled"} onclick="setRx('${k}','${x}')"><b>${x}</b><small>${RXS[x]}</small></button>`).join("");
+  const my = it.pick ? CIR[it.pick] : "미응답";
+  const label = it.rx==="D" ? "정답 선지의 핵심 키워드" : "두 선지를 구분하는 근거";
+  const req = it.rx || S.mode==="plain" ? "선택" : "";
+  const ph = it.rx==="D" ? "예: 광평성 → 궁예(태봉)의 정치 기구" : it.rx==="A" ? "남길 메모가 있으면 적으세요 (생략 가능)" : "예: 원종·애노의 난은 진성여왕 때, 김헌창의 난은 헌덕왕 때";
+  return `<div class="panel">${verdict}
+    <div class="sec"><div class="sec-t">문항 반응<em class="${it.rx||S.mode==="plain"?'done':''}">${it.rx?it.rx+" 선택":S.mode==="plain"?"선택 사항":"선택 필요"}</em></div><div class="rx">${rx}</div></div>
+    <div class="sec"><div class="sec-t">1줄 기록 · ${label}<em class="${complete(k)?'done':''}" id="reqTag">${req}</em></div>
+      <div class="meta"><b>${k}</b> / ${p.e} / 내 답 ${my} · 정답 ${CIR[p.a]}</div>
+      <input class="note" id="note" type="text" maxlength="160" ${it.rx||S.mode==="plain"?"":"disabled"} placeholder="${it.rx||S.mode==="plain"?ph:'문항 반응을 먼저 고르세요'}" value="${esc(it.note||"")}" oninput="setNote('${k}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();enterNext();}"></div>
+    ${expBox(k)}
+  </div>`;
+}
+function expBox(k){
+  const x=expOf(k), mine=isMine(k);
+  if(editExp===k){
+    return `<div class="sec exp-box"><div class="sec-t">해설 작성</div>
+      <textarea class="exp-edit" id="expEdit" placeholder="이 문항의 해설을 적으세요." oninput="expDraft=this.value">${esc(expDraft)}</textarea>
+      <div class="exp-btns">${mine?`<button class="btn ghost" onclick="revertExp('${k}')">원래대로</button>`:""}<button class="btn" onclick="cancelExp()">취소</button><button class="btn primary" onclick="saveExp('${k}')">저장</button></div></div>`;
+  }
+  return `<div class="sec exp-box"><div class="sec-t">해설<span class="exp-act">${mine?`<span class="exp-mine">작성함 · 반영 전</span>`:""}<button class="linkish" onclick="startExp('${k}')">${x?"수정":"작성"}</button></span></div>
+    ${x?`<div class="exp">${esc(x)}</div>`:`<div class="exp none">이 문항은 정리된 해설이 없습니다.</div>`}</div>`;
+}
+function sheet(){
+  const list=qList();
+  return `<div class="sheet">` + list.map((k,idx)=>{
+    const it=S.items[k]||{}; let c="cell";
+    c += isRight(k)?" ok":" no"; if(S.mode==="check" && !complete(k)) c+=" pending";
+    if(idx===qCur()) c+=" cur";
+    return `<button class="${c}" onclick="jump(${idx})"><b>${k}</b>${it.pick?CIR[it.pick]:"&nbsp;"}</button>`;
+  }).join("") + `</div><p class="muted" style="margin-top:6px">${S.mode==="check"?"• 표시는 아직 반응 분류가 남은 문항입니다.":"반응 분류·1줄 기록은 선택입니다."}</p>`;
+}
+
+/* ---------- 동작 ---------- */
+function pick(k,v){
+  if(graded(k)) return;
+  item(k).pick=v; S.updatedAt=Date.now(); persist();
+  renderQuiz(true, ()=>{ const pn=document.querySelector(".panel"); if(pn) pn.scrollIntoView({block:"nearest"}); });
+}
+function setRx(k,x){ const it=item(k); it.rx=x; S.updatedAt=Date.now(); persist(); renderQuiz(true, ()=>{ const f=$("#note"); if(f && x!=="A") f.focus({preventScroll:true}); }); }
+function setNote(k,v){
+  item(k).note=v; S.updatedAt=Date.now(); clearTimeout(setNote._h); setNote._h=setTimeout(persist,400);
+  const b=$("#nextBtn"); if(b && !EDIT) b.disabled=!canNext(k);
+  const need=$("#need"); if(need) need.textContent=missingMsg(k);
+  const tag=$("#reqTag"); if(tag) tag.classList.toggle("done",complete(k));
+}
+function enterNext(){ const b=$("#nextBtn"); if(b && !b.disabled) b.click(); }
+function go(d){
+  const list=qList();
+  if(EDIT){ editExp=null; EDIT.cur=Math.min(list.length-1,Math.max(0,EDIT.cur+d)); renderQuiz(); return; }
+  if(d>0 && !canNext(list[S.cur])) return;
+  editExp=null;
+  S.cur=Math.min(list.length-1,Math.max(0,S.cur+d)); persist(); renderQuiz();
+}
+function jump(i){ editExp=null; EDIT.cur=i; renderQuiz(); }
+function toggleSheet(){ showSheet=!showSheet; const y=window.scrollY; renderQuiz(); if(showSheet) document.querySelector(".sheet").scrollIntoView({block:"center"}); else window.scrollTo(0,y); }
+function finishAll(){ if(!canNext(S.list[S.cur])) return; S.finished=true; S.endedAt=Date.now(); persist(); renderResult(S); }
+function quitEarly(){
+  const answered=S.list.filter(k=>graded(k)).length;
+  if(!answered){ if(confirm("아직 푼 문항이 없습니다. 이 기록을 지울까요?")){ ALL=ALL.filter(x=>x.id!==S.id); saveAll(ALL); S=null; renderHome(); } return; }
+  const left=S.mode==="check" ? S.list.filter(k=>graded(k)&&!complete(k)).length : 0;
+  if(!confirm(`${answered}문항까지 푼 것으로 마칩니다.${left?` (반응 분류가 남은 문항 ${left}개)`:""} 결과를 볼까요?`)) return;
+  S.finished=true; S.endedAt=Date.now(); persist(); renderResult(S);
+}
+document.addEventListener("keydown",e=>{
+  if(view!=="quiz"||!S) return;
+  if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT") return;
+  const k=qList()[qCur()];
+  if(/^[1-5]$/.test(e.key) && !graded(k)) pick(k,+e.key);
+  else if(/^[abcdABCD]$/.test(e.key) && graded(k)){ const x=e.key.toUpperCase(); const ok=isRight(k); if((ok&&"AB".includes(x))||(!ok&&"CD".includes(x))) setRx(k,x); }
+  else if(e.key==="ArrowRight"){ if(EDIT||canNext(k)) go(1); }
+  else if(e.key==="ArrowLeft") go(-1);
+});
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ persist(); if(view==="result" && BK) bulkSave(); } });
+
+/* ---------- 통계 (푼 문항 기준) ---------- */
+function stats(s){
+  const list = s.list.filter(k=>s.items[k]&&s.items[k].pick&&BY[k]);
+  let got=0,max=0,right=0; const rx={A:0,B:0,C:0,D:0}; const rnd={}, era={};
+  list.forEach(k=>{
+    const p=BY[k], it=s.items[k], ok=it.pick===p.a;
+    max+=p.p; if(ok){got+=p.p;right++;}
+    if(it.rx) rx[it.rx]++;
+    rnd[p.r]=rnd[p.r]||{t:0,r:0}; rnd[p.r].t++; if(ok) rnd[p.r].r++;
+    era[p.e]=era[p.e]||{t:0,r:0}; era[p.e].t++; if(ok) era[p.e].r++;
+  });
+  const pending = s.mode==="check" ? list.filter(k=>!s.items[k].rx).length : 0;
+  return {list,got,max,right,rx,rnd,era,pending};
+}
+function pct(st){ return st.list.length?Math.round(st.right/st.list.length*100):0; }
+
+/* ---------- 화면: 결과 ---------- */
+function openResult(id){ const s=ALL.find(x=>x.id===id); if(s) renderResult(s); }
+function renderResult(s){
+  view="result"; EDIT=null;
+  const st=stats(s), check=s.mode==="check";
+  let h = mast();
+  h += `<div class="summary"><h2>풀이 결과</h2><p class="muted">${modeLabel(s)}${st.list.length<s.list.length?` · ${s.list.length}문항 중 ${st.list.length}문항에서 멈춤`:""}</p>
+    <div class="score-circle"><span class="num">${st.got}</span><span class="label">/ ${st.max}점</span></div>
+    <div class="summary-stats"><div><span class="stat-num">${st.right}</span><span class="stat-label">맞은 문제</span></div>
+      <div><span class="stat-num">${st.list.length}</span><span class="stat-label">푼 문제</span></div>
+      <div><span class="stat-num">${pct(st)}%</span><span class="stat-label">정답률</span></div></div></div>`;
+  h += `<div class="counts" id="counts">${countsHtml(st)}</div>`;
+  if(st.pending) h += `<p class="need" style="text-align:left">반응 분류가 빠진 문항이 ${st.pending}개 있습니다. 아래 "한번에 기록"에서 채울 수 있습니다.</p>`;
+  const ek=ERAS.filter(e=>st.era[e]);
+  if(ek.length>1) h += `<h2>시대별 정답률</h2><div class="tblwrap"><table><thead><tr><th>시대</th><th>정답</th><th>정답률</th></tr></thead><tbody>` +
+    ek.map(e=>{const v=st.era[e]; return `<tr><td>${e}</td><td>${v.r}/${v.t}</td><td>${Math.round(v.r/v.t*100)}%</td></tr>`;}).join("") + `</tbody></table></div>`;
+  const rk=Object.keys(st.rnd).map(Number).sort((a,b)=>a-b);
+  if(rk.length>1) h += `<h2>회차별 정답률</h2><div class="tblwrap"><table><thead><tr><th>회차</th><th>정답</th><th>정답률</th></tr></thead><tbody>` +
+    rk.map(r=>{const v=st.rnd[r]; return `<tr><td>제${r}회</td><td>${v.r}/${v.t}</td><td>${Math.round(v.r/v.t*100)}%</td></tr>`;}).join("") + `</tbody></table></div>`;
+  const wrong = st.list.filter(k=>!isRightIn(s,k));
+  if(!check) h += `<h2>틀린 문항 ${wrong.length?"("+wrong.length+")":""}</h2>` + (wrong.length ? `<div class="tblwrap"><table><thead><tr><th>문항</th><th>내 답</th><th>정답</th></tr></thead><tbody>` +
+    wrong.map(k=>`<tr><td>제${BY[k].r}회 ${BY[k].n}번</td><td>${CIR[s.items[k].pick]}</td><td>${CIR[BY[k].a]}</td></tr>`).join("") + `</tbody></table></div>` : `<p class="muted">없습니다.</p>`);
+  h += bulkBox(s, st);
+  h += `<h2>코치에게 보낼 기록</h2><p class="muted" style="margin-bottom:8px">아래 내용을 복사해서 학습 코치 채팅에 그대로 붙여넣으세요.</p>
+    <textarea class="out" id="out" readonly>${esc(exportText(s))}</textarea>
+    <div class="nav"><button class="btn" onclick="renderHome()">처음으로</button><button class="btn" onclick="editRecord('${s.id}')">기록 수정</button><button class="btn primary" onclick="copyOut()">기록 복사</button></div>`;
+  $("#app").innerHTML=h; window.scrollTo(0,0);
+}
+function countsHtml(st){ return ["A","B","C","D"].map(x=>`<div><b style="color:var(--${x})">${st.rx[x]}</b>${x} ${RX[x]}</div>`).join(""); }
+/* 한번에 기록 (2026-10-14): 문제를 먼저 쭉 풀고, 결과 화면에서 푼 문항 전체의 반응·1줄 기록을 한 목록으로 쓴다.
+   고칠 때마다 바로 저장하고 아래 "코치에게 보낼 기록" 을 갱신한다. 화면을 다시 그리지 않으므로 스크롤·입력 위치가 유지된다. */
+let BK = null;   // 결과 화면에 띄운 기록
+function bulkBox(s, st){
+  BK = s;
+  const rows = st.list.map(k=>{
+    const p=BY[k], it=s.items[k], ok=it.pick===p.a, allowed = ok ? ["A","B"] : ["C","D"];
+    return `<div class="bk" data-k="${k}"><div class="bk-h"><b>${k}</b><span>${p.e}</span><span>내 답 ${CIR[it.pick]} · 정답 ${CIR[p.a]}</span><span class="${ok?"ok":"no"}">${ok?"✓":"✗"}</span></div>
+      <div class="bk-row">${allowed.map(x=>`<button class="rxb ${it.rx===x?'on':''}" data-k="${x}" onclick="bulkRx('${k}','${x}',this)"><b>${x}</b><small>${RXS[x]}</small></button>`).join("")}
+        <input class="note" type="text" maxlength="160" placeholder="1줄 기록 (선택)" value="${esc(it.note||"")}" oninput="bulkNote('${k}',this.value)"></div>
+      <details><summary>문제 보기</summary><img loading="lazy" src="data/${p.r}/img/q${String(p.n).padStart(2,"0")}.jpg" alt="${p.r}회 ${p.n}번 문제"></details></div>`;
+  }).join("");
+  return `<h2>한번에 기록 ${st.list.length?"("+st.list.length+")":""}</h2><p class="muted" style="margin-bottom:8px">푼 문항의 반응과 1줄 기록을 여기서 한꺼번에 남깁니다. 고르면 바로 저장되고, 같은 반응을 다시 누르면 지워집니다.</p>${rows||`<p class="muted">푼 문항이 없습니다.</p>`}`;
+}
+function bulkSave(){ BK.updatedAt=Date.now(); const i=ALL.findIndex(x=>x.id===BK.id); if(i<0) ALL.push(BK); else ALL[i]=BK; saveAll(ALL); }
+function bulkRefresh(){ const o=$("#out"); if(o) o.value=exportText(BK); const c=$("#counts"); if(c) c.innerHTML=countsHtml(stats(BK)); }
+function bulkRx(k,x,btn){
+  const it=BK.items[k]; it.rx = it.rx===x ? undefined : x; if(!it.rx) delete it.rx;
+  btn.parentNode.querySelectorAll(".rxb").forEach(b=>b.classList.toggle("on", b.dataset.k===it.rx));
+  bulkSave(); bulkRefresh();
+}
+function bulkNote(k,v){ BK.items[k].note=v; clearTimeout(bulkNote._h); bulkNote._h=setTimeout(bulkSave,400); bulkRefresh(); }
+function isRightIn(s,k){ const it=s.items[k]; return !!(it && it.pick===BY[k].a); }
+function exportText(s){
+  const st=stats(s), check=s.mode==="check";
+  const L=[];
+  L.push(`[한능검 학습 기록] ${fmtDate(s.startedAt)}`);
+  L.push(`회차: ${s.scope==="all"?"전 회차":`제${s.scope}회`} / 시대: ${s.era} / 모드: 시대별 ${MODE[s.mode]} ${s.list.length}문항${s.order==="rand"?"(무작위)":""}`);
+  L.push(`점수: ${st.got}/${st.max}점 (정답 ${st.right}/${st.list.length}문항)${st.list.length<s.list.length?` / ${s.list.length}문항 중 ${st.list.length}문항에서 멈춤`:""}`);
+  L.push(`문항 반응: A ${st.rx.A} / B ${st.rx.B} / C ${st.rx.C} / D ${st.rx.D}${st.pending?` / 미분류·미기록 ${st.pending}`:""}`);
+  L.push(`시대별 정답률: ` + ERAS.filter(e=>st.era[e]).map(e=>`${e} ${st.era[e].r}/${st.era[e].t}`).join(", "));
+  const rk=Object.keys(st.rnd).map(Number).sort((a,b)=>a-b);
+  if(rk.length>1) L.push(`회차별 정답률: ` + rk.map(r=>`${r}회 ${st.rnd[r].r}/${st.rnd[r].t}`).join(", "));
+  // 행 양식은 회차 기록과 같다. 그냥 풀기에서 반응을 고르지 않은 문항은 "-" 로 표시한다.
+  const row = (x,k) => { const it=s.items[k], p=BY[k]; return `${x} | ${k} / ${p.e} / 내 답 ${it.pick?CIR[it.pick]:"미응답"}·정답 ${CIR[p.a]} / ${(it.note||"").trim()||"(기록 없음)"}`; };
+  const rows = x => st.list.filter(k=>s.items[k].rx===x).map(k=>row(x,k));
+  const unrxWrong = check ? [] : st.list.filter(k=>!s.items[k].rx && !isRightIn(s,k)).map(k=>row("-",k));
+  const wrong=[...rows("C"),...rows("D"),...unrxWrong], confused=rows("B");
+  L.push(""); L.push("[오답 1줄 기록]"); L.push(...(wrong.length?wrong:["없음"]));
+  L.push(""); L.push("[헷갈렸는데 맞은 문항]"); L.push(...(confused.length?confused:["없음"]));
+  const memo = st.list.filter(k=>{const it=s.items[k]; return (it.rx==="A" || (!check && !it.rx && isRightIn(s,k))) && (it.note||"").trim();})
+    .map(k=>`${s.items[k].rx||"-"} | ${k} / ${BY[k].e} / ${s.items[k].note.trim()}`);
+  if(memo.length){ L.push(""); L.push("[메모]"); L.push(...memo); }
+  const unrx = st.list.filter(k=>!s.items[k].rx);
+  if(check && unrx.length){ L.push(""); L.push(`[반응 미분류] ` + unrx.join(", ")); }
+  return L.join("\n");
+}
+function copyOut(){
+  const t=$("#out"); const txt=t.value;
+  const fallback=()=>{ t.removeAttribute("readonly"); t.select(); try{document.execCommand("copy"); toast("복사했습니다.");}catch(e){ toast("길게 눌러 직접 복사하세요."); } t.setAttribute("readonly",""); };
+  if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(txt).then(()=>toast("복사했습니다."),fallback); } else fallback();
+}
+
+/* ---------- 백업 (회차 화면과 같은 파일 형식) ---------- */
+function backup(){
+  const blob=new Blob([JSON.stringify(ALL)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`한능검_기록백업_${fmtDate(Date.now()).slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function restore(inp){
+  const f=inp.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const arr=JSON.parse(r.result); if(!Array.isArray(arr)) throw 0;
+      const ts=x=>x.updatedAt||x.endedAt||x.startedAt||0;
+      let add=0, upd=0; arr.forEach(x=>{ if(!x || !x.id) return; const i=ALL.findIndex(y=>y.id===x.id);
+        if(i<0){ ALL.push(x); add++; } else if(ts(x)>ts(ALL[i])){ ALL[i]=x; upd++; } });
+      saveAll(ALL); toast(`기록 ${add}개를 불러왔습니다.`+(upd?` (${upd}개는 더 최근에 고친 기록으로 바꿈)`:"")); renderHome();
+    }catch(e){ toast("백업 파일 형식이 맞지 않습니다."); } };
+  r.readAsText(f); inp.value="";
+}
+
+renderHome();
+</script>
+</body>
+</html>

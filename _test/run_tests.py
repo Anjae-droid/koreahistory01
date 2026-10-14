@@ -1,5 +1,5 @@
 """
-run_tests.py  (ver5.2 - 2026.10.14, 시대별 결과 화면 한번에 기록 검사 추가)
+run_tests.py  (ver5.3 - 2026.10.14, 시대별 한번에 풀기(제출 후 채점) 검사 추가)
 dist/ 웹앱을 실제 브라우저(Chromium)로 열어 핵심 흐름을 검사한다.
 빌드 후, 템플릿이나 build.py 를 고친 뒤에 실행한다.
 
@@ -276,6 +276,34 @@ async def era_tests(b, pg):
     await pg.wait_for_timeout(300)
     out = await pg.input_value("#out")
     check("항목체크 기록 텍스트", f"C | {lst[0]} / 조선" in out and "시대별 근거" in out and "무작위" in out, out[:300])
+    # 한번에 풀기 (2026-10-14): 채점 없이 끝까지 풀고 제출 → 결과 화면에서 한번에 기록
+    await pg.click("text=처음으로")
+    await pg.select_option("#scope", "all")
+    await pg.select_option("#order", "seq")
+    await pg.select_option("#count", "5")
+    await pg.click("text=한번에 풀기 시작")
+    a = await pg.evaluate("BY[S.list[0]].a")
+    await pg.click(f".bub >> nth={a % 5}")
+    check("한번에 풀기: 답 골라도 채점 안 함", await pg.locator(".verdict").count() == 0 and await pg.locator(".bub.correct").count() == 0)
+    await pg.click(f".bub >> nth={a - 1}")                     # 답 바꾸기
+    check("한번에 풀기: 제출 전 답 변경", await pg.evaluate("S.items[S.list[0]].pick") == a)
+    check("한번에 풀기: 시계 없음", await pg.locator("#clock").count() == 0)
+    await pg.click("#nextBtn")
+    await pg.click(".bub >> nth=0")
+    await pg.click("text=답안지 보기")
+    check("한번에 풀기: 답안지 표시", await pg.locator(".sheet .cell.filled").count() == 2)
+    await pg.click(".bar >> text=제출")
+    await pg.wait_for_timeout(300)
+    check("한번에 풀기: 제출 후 결과·한번에 기록 5문항", await pg.locator(".bk").count() == 5)
+    out = await pg.input_value("#out")
+    check("한번에 풀기: 기록 텍스트(빈 문항은 미응답 오답)", "한번에 풀기 5문항" in out and "미응답" in out, out[:400])
+    k0 = await pg.evaluate("BK.list[0]")
+    await pg.click(f'.bk[data-k="{k0}"] .rxb[data-k="A"]')
+    check("한번에 풀기: 결과에서 반응 기록", "문항 반응: A 1" in await pg.input_value("#out"))
+    k4 = await pg.evaluate("BK.list[4]")
+    await pg.click(f'.bk[data-k="{k4}"] .rxb[data-k="D"]')
+    check("한번에 풀기: 빈 문항에도 반응 기록", f"D | {k4}" in await pg.input_value("#out"))
+
     # 회차 화면에는 시대별 기록이 섞이지 않음
     r0 = lst[0].split("-")[0]
     await pg.goto(url(f"round_{r0}.html"))
