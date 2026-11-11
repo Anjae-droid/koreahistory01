@@ -1,5 +1,5 @@
 """
-run_tests.py  (ver5.3 - 2026.10.14, 시대별 한번에 풀기(제출 후 채점) 검사 추가)
+run_tests.py  (ver5.5 - 2026.11.11, 기록 텍스트 [풀이 문항] 섹션 검사 추가)
 dist/ 웹앱을 실제 브라우저(Chromium)로 열어 핵심 흐름을 검사한다.
 빌드 후, 템플릿이나 build.py 를 고친 뒤에 실행한다.
 
@@ -21,6 +21,19 @@ results = []
 def check(name, ok, detail=""):
     results.append(ok)
     print(("  통과 " if ok else "  실패 ") + name + (f"  ({detail})" if detail and not ok else ""))
+
+
+def solved_rows(out):
+    """기록 텍스트의 [풀이 문항] 섹션 줄 목록 (2026-11-11). [오답 1줄 기록] 보다 위에 있어야 한다."""
+    lines = out.splitlines()
+    if "[풀이 문항]" not in lines or lines.index("[풀이 문항]") > lines.index("[오답 1줄 기록]"):
+        return []
+    rows = []
+    for x in lines[lines.index("[풀이 문항]") + 1:]:
+        if not x.strip():
+            break
+        rows.append(x)
+    return rows
 
 
 def url(fn):
@@ -131,6 +144,8 @@ async def main():
         out = await pg.input_value("#out")
         check("기록 텍스트에 B·D 항목", "B |" in out and "D |" in out)
         check("연습 기록에 시간 줄 없음", "시간" not in out.splitlines()[1])
+        sec = solved_rows(out)
+        check("풀이 문항 섹션(출제 순서·O·X·반응)", len(sec) == 2 and sec[0].endswith(" / O / B") and sec[1].endswith(" / X / D"), out)
         # 3-1a. 마친 기록 수정 (2026-10-05): 답은 고정, 반응·1줄 기록만 고친다
         await pg.click("button:has-text('기록 수정')")
         check("기록 수정: 답 버튼 잠김", await pg.locator(".bub:enabled").count() == 0)
@@ -303,6 +318,11 @@ async def era_tests(b, pg):
     k4 = await pg.evaluate("BK.list[4]")
     await pg.click(f'.bk[data-k="{k4}"] .rxb[data-k="D"]')
     check("한번에 풀기: 빈 문항에도 반응 기록", f"D | {k4}" in await pg.input_value("#out"))
+    out = await pg.input_value("#out")
+    sec = solved_rows(out)
+    check("한번에 풀기: 풀이 문항 5줄(출제 순서·반응 없으면 -)", len(sec) == 5 and sec[0].startswith(k0 + " / ") and sec[0].endswith(" / A")
+          and sec[4].startswith(k4 + " / ") and sec[4].endswith(" / X / D") and sum(x.endswith(" / -") for x in sec) == 3, out)
+    check("한번에 풀기: 풀이 문항에 주제 채워짐(문항.csv 주제 칸)", all("주제 미등록" not in x for x in sec), "\n".join(sec))
 
     # 회차 화면에는 시대별 기록이 섞이지 않음
     r0 = lst[0].split("-")[0]

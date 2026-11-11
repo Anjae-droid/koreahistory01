@@ -569,6 +569,8 @@ function exportText(s){
   const rows = x => st.list.filter(k=>rx(k)===x).map(k=>row(x,k));
   const unrxWrong = check ? [] : st.list.filter(k=>!rx(k) && !isRightIn(s,k)).map(k=>row("-",k));
   const wrong=[...rows("C"),...rows("D"),...unrxWrong], confused=rows("B");
+  // 풀이 문항 (2026-11-11): 출제 순서대로 회차-번호 / 시대 / 주제 / O·X / 반응
+  L.push(""); L.push("[풀이 문항]"); L.push(...st.list.map(k=>`${k} / ${BY[k].e} / ${BY[k].k||"주제 미등록"} / ${isRightIn(s,k)?"O":"X"} / ${rx(k)||"-"}`));
   L.push(""); L.push("[오답 1줄 기록]"); L.push(...(wrong.length?wrong:["없음"]));
   L.push(""); L.push("[헷갈렸는데 맞은 문항]"); L.push(...(confused.length?confused:["없음"]));
   const memo = st.list.filter(k=>{const it=s.items[k]||{}; return (it.rx==="A" || (!check && !it.rx && isRightIn(s,k))) && (it.note||"").trim();})

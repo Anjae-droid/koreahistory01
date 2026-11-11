@@ -120,7 +120,7 @@ def write_round(r, items, overwrite, stamp):
         os.makedirs(bak, exist_ok=True)
         shutil.copy2(path, os.path.join(bak, "문항.csv"))
         with open(path, "w", encoding="utf-8-sig", newline="") as fp:
-            w = csv.DictWriter(fp, fieldnames=["번호", "정답", "배점", "시대", "검토필요", "해설"])
+            w = csv.DictWriter(fp, fieldnames=list(rows[0].keys()))  # 주제 등 추가 칸 유지
             w.writeheader()
             w.writerows(rows)
     print(f"  {r}회: 반영 {len(put)}개 {put}" + (f" / 기존 해설 있어 건너뜀 {skip}" if skip else ""))
