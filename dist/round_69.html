@@ -489,6 +489,8 @@ function exportText(s){
     return `${k} | ${s.round}-${n} / ${p.e} / 내 답 ${it.pick?CIR[it.pick]:"미응답"}·정답 ${CIR[p.a]} / ${(it.note||"").trim()||"(기록 없음)"}`;
   });
   const wrong=[...rows("C"),...rows("D")], confused=rows("B");
+  // 풀이 문항 (2026-11-11): 출제 순서대로 회차-번호 / 시대 / 주제 / O·X / 반응 (시대별 화면과 같은 형식)
+  L.push(""); L.push("[풀이 문항]"); L.push(...st.list.map(n=>{ const it=s.items[n]||{}, p=BY[n]; return `${s.round}-${n} / ${p.e} / ${p.k||"주제 미등록"} / ${it.pick===p.a?"O":"X"} / ${it.rx||"-"}`; }));
   L.push(""); L.push("[오답 1줄 기록]"); L.push(...(wrong.length?wrong:["없음"]));
   L.push(""); L.push("[헷갈렸는데 맞은 문항]"); L.push(...(confused.length?confused:["없음"]));
   const memo = st.list.filter(n=>{const it=s.items[n]||{}; return it.rx==="A" && (it.note||"").trim();}).map(n=>`A | ${s.round}-${n} / ${BY[n].e} / ${s.items[n].note.trim()}`);

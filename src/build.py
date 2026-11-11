@@ -3,7 +3,7 @@ build.py  (ver2 - 2026.10.13, 시대별 풀이용 all.js·era.html 추가)
 data/ 의 회차별 문항.csv·이미지를 읽어 dist/ 에 웹앱을 생성한다.
 
   data/rounds.csv            회차,시행일
-  data/<회차>/문항.csv       번호,정답,배점,시대,검토필요,해설
+  data/<회차>/문항.csv       번호,정답,배점,시대,검토필요,해설[,주제]
   data/<회차>/img/qNN.jpg    문항 이미지
 
 생성물(dist/)은 직접 수정하지 않는다. 디자인은 src/template_*.html 만 고친다.
@@ -53,7 +53,11 @@ def load_round(r):
             errors.append(f"{r}회 {n}번: 이미지 없음 ({img})")
         if (row.get("검토필요") or "").strip():
             warns.append(f"{r}회 {n}번: 검토필요 표시 남아 있음")
-        probs.append({"n": n, "a": a, "p": p, "e": era, "x": (row.get("해설") or "").strip()})
+        item = {"n": n, "a": a, "p": p, "e": era, "x": (row.get("해설") or "").strip()}
+        topic = (row.get("주제") or "").strip()   # 선택 칸 (2026-11-11). 비어 있으면 기록에 '주제 미등록'
+        if topic:
+            item["k"] = topic
+        probs.append(item)
     nums = sorted(x["n"] for x in probs)
     if nums != list(range(1, 51)):
         errors.append(f"{r}회: 문항 번호가 1~50 이 아님 (현재 {len(nums)}개)")
