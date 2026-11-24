@@ -107,7 +107,6 @@ a.btn{text-decoration:none;display:inline-block}
 
 .nav{display:flex;gap:8px;margin-top:12px}
 .nav .btn{flex:1;border-radius:6px}
-.need{font-size:12.5px;color:var(--wrong);text-align:right;margin-top:6px;min-height:18px}
 
 .sheet{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px;box-shadow:var(--shadow)}
 .cell{border:1px solid var(--line);border-radius:4px;background:#fff;padding:5px 0;text-align:center;font-size:12px;line-height:1.2}
@@ -157,10 +156,11 @@ footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);pa
 .bk-h b{color:var(--accent)}
 .bk-h .ok{color:var(--correct);font-weight:700}
 .bk-h .no{color:var(--wrong);font-weight:700}
-.bk-row{display:flex;gap:6px;align-items:stretch}
+.bk-row{display:flex;gap:6px;align-items:stretch;flex-wrap:wrap}
 .bk-row .rxb{flex:0 0 64px;padding:6px 2px}
 .bk-row .rxb b{font-size:15px}
-.bk-row .note{flex:1;min-width:0;padding:8px}
+.bk-row .rxb small{white-space:normal;word-break:keep-all}
+.bk-row .note{flex:1 1 140px;min-width:140px;padding:8px}
 .bk details{margin-top:8px}
 .bk summary{font-size:12.5px;color:var(--ink-soft);cursor:pointer}
 .bk details img{width:100%;height:auto;display:block;margin-top:6px;border-radius:6px;background:#fff}
@@ -171,7 +171,7 @@ footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);pa
   .bubbles{gap:4px}
   .bub{padding:10px 2px;font-size:16px}
   .sheet{grid-template-columns:repeat(5,1fr)}
-  .rxb small{font-size:10.5px}
+  .rxb small{font-size:10.5px;white-space:normal;word-break:keep-all;display:inline-block;line-height:1.25}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -184,7 +184,7 @@ footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);pa
 /* 생성물: src/template_era.html 을 build.py 가 복사한 파일입니다. 직접 수정하지 마십시오. */
 /* 시대별 풀이 (2026-10-13). 회차 화면(template_round.html)과 같은 기록 저장소를 쓰고, 기록은 kind:"era" 로 구분한다.
    문항 키는 "회차-번호" (예: "79-12"). 시간 제한 없음.
-   모드: plain(그냥 풀기 — 반응 분류·1줄 기록 모두 선택) / check(항목체크 — 반응 분류 필수, 1줄 기록 선택)
+   모드: plain(그냥 풀기 — 반응 분류·1줄 기록 모두 선택) / check(항목체크 — 반응 분류·1줄 기록 모두 선택, 미분류 문항 표시)
         / batch(한번에 풀기 — 회차 실전처럼 채점 없이 끝까지 풀고 제출, 기록은 결과 화면 "한번에 기록"에서. 시간 제한 없음).
    여러 시대 (2026-10-14): era.html#조선,개항기 → 기록에 eras:[...] 저장. 옛 기록은 era:"조선" 하나만 있다. */
 const AD = window.ALL_DATA || {rounds:[], problems:[]};
@@ -199,8 +199,8 @@ const EROUNDS = [...new Set(EP.map(p=>p.r))].sort((a,b)=>b-a);      // 고른 �
 function erasOf(s){ return s.eras || [s.era]; }
 function sameSel(s){ return erasOf(s).join(",")===SEL.join(","); }
 const CIR = ["","①","②","③","④","⑤"];
-const RX = {A:"바로 맞음",B:"헷갈렸는데 맞음",C:"두 선지에서 틀림",D:"아예 모름"};
-const RXS = {A:"바로 맞음",B:"헷갈려 맞음",C:"둘 중 틀림",D:"아예 모름"};
+const RX = {A:"바로 맞음",B:"헷갈렸는데 맞음",C:"헷갈려서 틀림",D:"아예 모름"};
+const RXS = {A:"바로 맞음",B:"헷갈려 맞음",C:"헷갈려서 틀림",D:"아예 모름"};
 const MODE = {plain:"그냥 풀기", check:"항목체크", batch:"한번에 풀기"};
 const KEY = "hkh.sessions.v1";
 const EXKEY = "hkh.exps.v1";      // 풀이 화면에서 작성한 해설 {"회차-번호": {t, at}} — 해설_추가.bat 로 문항.csv 에 반영
@@ -261,9 +261,8 @@ function item(k){ if(!S.items[k]) S.items[k]={}; return S.items[k]; }
 function live(){ return S.mode==="batch" && !S.submitted && !EDIT; }   // 한번에 풀기 제출 전: 채점·정답 표시 없음
 function graded(k){ return S.mode==="batch" ? !!S.submitted : !!(S.items[k] && S.items[k].pick); }
 function isRight(k){ const it=S.items[k]; return !!(it && it.pick===BY[k].a); }
-function complete(k){ const it=S.items[k]||{}; return !!it.rx; }   // 1줄 기록은 항상 선택 (2026-10-14)
-function canNext(k){ return live() || graded(k) && (S.mode!=="check" || complete(k)); }
-function missingMsg(k){ if(S.mode!=="check") return ""; const it=S.items[k]||{}; return it.rx ? "" : "문항 반응을 먼저 고르세요."; }
+function complete(k){ const it=S.items[k]||{}; return !!it.rx; }   // 반응 분류를 했는지. 반응·1줄 기록 모두 선택 (2026-11-24)
+function canNext(k){ return live() || graded(k); }
 
 /* ---------- 화면: 홈 ---------- */
 function curOpt(){
@@ -302,7 +301,7 @@ function renderHome(){
   h += `<div class="modes" style="margin-top:10px">
     <div class="mode"><h3>그냥 풀기</h3><p>답을 고르면 바로 채점하고 해설을 보여 줍니다. 반응 분류와 1줄 기록은 남기고 싶을 때만 남깁니다. 중간에 그만두면 거기까지의 점수와 정답률을 봅니다.</p>
       <div class="btnrow"><button class="btn primary" onclick="start('plain')">그냥 풀기 시작</button></div></div>
-    <div class="mode"><h3>항목체크 풀기</h3><p>회차 연습과 같이 문항마다 바로 채점하고, 반응 분류(A~D)를 고른 뒤 넘어갑니다. 1줄 기록은 선택입니다.</p>
+    <div class="mode"><h3>항목체크 풀기</h3><p>회차 연습과 같이 문항마다 바로 채점합니다. 반응 분류(A~D)와 1줄 기록은 선택이고, 분류하지 않은 문항을 결과에 따로 보여 줍니다.</p>
       <div class="btnrow"><button class="btn primary" onclick="start('check')">항목체크 풀기 시작</button></div></div>
     <div class="mode"><h3>한번에 풀기</h3><p>회차 실전처럼 채점 없이 끝까지 풀고 제출합니다. 답은 제출 전까지 바꿀 수 있고, 반응 분류와 1줄 기록은 결과 화면에서 한꺼번에 남깁니다. 시간 제한 없음.</p>
       <div class="btnrow"><button class="btn primary" onclick="start('batch')">한번에 풀기 시작</button></div></div>
@@ -378,14 +377,13 @@ function renderQuiz(keep, after){
   const last = cur===list.length-1;
   if(EDIT){
     h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button><button class="btn" onclick="toggleSheet()">번호판 ${showSheet?'닫기':'보기'}</button>
-      <button class="btn primary" id="nextBtn" onclick="${last?'finishEdit()':'go(1)'}">${last?'수정 마치기':'다음'}</button></div><div class="need" id="need">${missingMsg(k)}</div>`;
+      <button class="btn primary" id="nextBtn" onclick="${last?'finishEdit()':'go(1)'}">${last?'수정 마치기':'다음'}</button></div>`;
   } else if(live()){
     h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button><button class="btn" onclick="toggleSheet()">답안지 ${showSheet?'닫기':'보기'}</button>
       <button class="btn primary" id="nextBtn" onclick="${last?'submitBatch()':'go(1)'}">${last?'제출':'다음'}</button></div>`;
   } else {
     h += `<div class="nav"><button class="btn" ${cur===0?"disabled":""} onclick="go(-1)">이전</button>
-      <button class="btn primary" id="nextBtn" ${canNext(k)?"":"disabled"} onclick="${last?'finishAll()':'go(1)'}">${last?'결과 보기':'다음 문제'}</button></div>
-      <div class="need" id="need">${g?missingMsg(k):""}</div>`;
+      <button class="btn primary" id="nextBtn" ${canNext(k)?"":"disabled"} onclick="${last?'finishAll()':'go(1)'}">${last?'결과 보기':'다음 문제'}</button></div>`;
   }
   if((EDIT || live()) && showSheet) h += sheet();
   $("#app").innerHTML = h;
@@ -397,17 +395,15 @@ function panel(k){
   const p=BY[k], it=S.items[k]||{}, ok=isRight(k);
   const verdict = ok ? `<div class="verdict ok">✓ 정답입니다!<span>(배점 ${p.p}점)</span></div>`
     : `<div class="verdict no">✗ ${it.pick?"오답입니다.":"미응답입니다."}<span>정답은 ${CIR[p.a]}번입니다.</span></div>`;
-  const allowed = ok ? ["A","B"] : ["C","D"];
-  const rx = Object.keys(RX).map(x=>`<button class="rxb ${it.rx===x?'on':''}" data-k="${x}" ${allowed.includes(x)?"":"disabled"} onclick="setRx('${k}','${x}')"><b>${x}</b><small>${RXS[x]}</small></button>`).join("");
+  const rx = Object.keys(RX).map(x=>`<button class="rxb ${it.rx===x?'on':''}" data-k="${x}" onclick="setRx('${k}','${x}')"><b>${x}</b><small>${RXS[x]}</small></button>`).join("");
   const my = it.pick ? CIR[it.pick] : "미응답";
   const label = it.rx==="D" ? "정답 선지의 핵심 키워드" : "두 선지를 구분하는 근거";
-  const req = it.rx || S.mode==="plain" ? "선택" : "";
   const ph = it.rx==="D" ? "예: 광평성 → 궁예(태봉)의 정치 기구" : it.rx==="A" ? "남길 메모가 있으면 적으세요 (생략 가능)" : "예: 원종·애노의 난은 진성여왕 때, 김헌창의 난은 헌덕왕 때";
   return `<div class="panel">${verdict}
-    <div class="sec"><div class="sec-t">문항 반응<em class="${it.rx||S.mode==="plain"?'done':''}">${it.rx?it.rx+" 선택":S.mode==="plain"?"선택 사항":"선택 필요"}</em></div><div class="rx">${rx}</div></div>
-    <div class="sec"><div class="sec-t">1줄 기록 · ${label}<em class="${complete(k)?'done':''}" id="reqTag">${req}</em></div>
+    <div class="sec"><div class="sec-t">문항 반응<em class="done">${it.rx?it.rx+" 선택":"선택 사항"}</em></div><div class="rx">${rx}</div></div>
+    <div class="sec"><div class="sec-t">1줄 기록 · ${label}<em class="done">선택 사항</em></div>
       <div class="meta"><b>${k}</b> / ${p.e} / 내 답 ${my} · 정답 ${CIR[p.a]}</div>
-      <input class="note" id="note" type="text" maxlength="160" ${it.rx||S.mode==="plain"?"":"disabled"} placeholder="${it.rx||S.mode==="plain"?ph:'문항 반응을 먼저 고르세요'}" value="${esc(it.note||"")}" oninput="setNote('${k}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();enterNext();}"></div>
+      <input class="note" id="note" type="text" maxlength="160" placeholder="${ph}" value="${esc(it.note||"")}" oninput="setNote('${k}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();enterNext();}"></div>
     ${expBox(k)}
   </div>`;
 }
@@ -429,7 +425,7 @@ function sheet(){
     else { c += isRight(k)?" ok":" no"; if(S.mode==="check" && !complete(k)) c+=" pending"; }
     if(idx===qCur()) c+=" cur";
     return `<button class="${c}" onclick="jump(${idx})"><b>${k}</b>${it.pick?CIR[it.pick]:"&nbsp;"}</button>`;
-  }).join("") + `</div><p class="muted" style="margin-top:6px">${live()?"번호를 누르면 그 문항으로 갑니다.":S.mode==="check"?"• 표시는 아직 반응 분류가 남은 문항입니다.":"반응 분류·1줄 기록은 선택입니다."}</p>`;
+  }).join("") + `</div><p class="muted" style="margin-top:6px">${live()?"번호를 누르면 그 문항으로 갑니다.":S.mode==="check"?"• 표시는 반응 분류를 하지 않은 문항입니다(선택).":"반응 분류·1줄 기록은 선택입니다."}</p>`;
 }
 
 /* ---------- 동작 ---------- */
@@ -441,9 +437,6 @@ function pick(k,v){
 function setRx(k,x){ const it=item(k); it.rx=x; S.updatedAt=Date.now(); persist(); renderQuiz(true, ()=>{ const f=$("#note"); if(f && x!=="A") f.focus({preventScroll:true}); }); }
 function setNote(k,v){
   item(k).note=v; S.updatedAt=Date.now(); clearTimeout(setNote._h); setNote._h=setTimeout(persist,400);
-  const b=$("#nextBtn"); if(b && !EDIT) b.disabled=!canNext(k);
-  const need=$("#need"); if(need) need.textContent=missingMsg(k);
-  const tag=$("#reqTag"); if(tag) tag.classList.toggle("done",complete(k));
 }
 function enterNext(){ const b=$("#nextBtn"); if(b && !b.disabled) b.click(); }
 function go(d){
@@ -469,8 +462,7 @@ function quitEarly(){
   }
   const answered=S.list.filter(k=>graded(k)).length;
   if(!answered){ if(confirm("아직 푼 문항이 없습니다. 이 기록을 지울까요?")){ ALL=ALL.filter(x=>x.id!==S.id); saveAll(ALL); S=null; renderHome(); } return; }
-  const left=S.mode==="check" ? S.list.filter(k=>graded(k)&&!complete(k)).length : 0;
-  if(!confirm(`${answered}문항까지 푼 것으로 마칩니다.${left?` (반응 분류가 남은 문항 ${left}개)`:""} 결과를 볼까요?`)) return;
+  if(!confirm(`${answered}문항까지 푼 것으로 마칩니다. 결과를 볼까요?`)) return;
   S.finished=true; S.endedAt=Date.now(); persist(); renderResult(S);
 }
 document.addEventListener("keydown",e=>{
@@ -479,7 +471,7 @@ document.addEventListener("keydown",e=>{
   const k=qList()[qCur()];
   if(/^[1-5]$/.test(e.key) && !graded(k)) pick(k,+e.key);
   else if(live()){ if(e.key==="ArrowRight") go(1); else if(e.key==="ArrowLeft") go(-1); }
-  else if(/^[abcdABCD]$/.test(e.key) && graded(k)){ const x=e.key.toUpperCase(); const ok=isRight(k); if((ok&&"AB".includes(x))||(!ok&&"CD".includes(x))) setRx(k,x); }
+  else if(/^[abcdABCD]$/.test(e.key) && graded(k)){ const x=e.key.toUpperCase(); setRx(k,x); }
   else if(e.key==="ArrowRight"){ if(EDIT||canNext(k)) go(1); }
   else if(e.key==="ArrowLeft") go(-1);
 });
@@ -513,7 +505,7 @@ function renderResult(s){
       <div><span class="stat-num">${st.list.length}</span><span class="stat-label">푼 문제</span></div>
       <div><span class="stat-num">${pct(st)}%</span><span class="stat-label">정답률</span></div></div></div>`;
   h += `<div class="counts" id="counts">${countsHtml(st)}</div>`;
-  if(st.pending) h += `<p class="need" style="text-align:left">반응 분류가 빠진 문항이 ${st.pending}개 있습니다. 아래 "한번에 기록"에서 채울 수 있습니다.</p>`;
+  if(st.pending) h += `<p class="muted" style="margin-top:6px">반응 분류를 하지 않은 문항 ${st.pending}개(선택). 아래 "한번에 기록"에서 남길 수 있습니다.</p>`;
   const ek=ERAS.filter(e=>st.era[e]);
   if(ek.length>1) h += `<h2>시대별 정답률</h2><div class="tblwrap"><table><thead><tr><th>시대</th><th>정답</th><th>정답률</th></tr></thead><tbody>` +
     ek.map(e=>{const v=st.era[e]; return `<tr><td>${e}</td><td>${v.r}/${v.t}</td><td>${Math.round(v.r/v.t*100)}%</td></tr>`;}).join("") + `</tbody></table></div>`;
@@ -536,9 +528,9 @@ let BK = null;   // 결과 화면에 띄운 기록
 function bulkBox(s, st){
   BK = s;
   const rows = st.list.map(k=>{
-    const p=BY[k], it=s.items[k]||{}, ok=it.pick===p.a, allowed = ok ? ["A","B"] : ["C","D"];
+    const p=BY[k], it=s.items[k]||{}, ok=it.pick===p.a;
     return `<div class="bk" data-k="${k}"><div class="bk-h"><b>${k}</b><span>${p.e}</span><span>내 답 ${it.pick?CIR[it.pick]:"미응답"} · 정답 ${CIR[p.a]}</span><span class="${ok?"ok":"no"}">${ok?"✓":"✗"}</span></div>
-      <div class="bk-row">${allowed.map(x=>`<button class="rxb ${it.rx===x?'on':''}" data-k="${x}" onclick="bulkRx('${k}','${x}',this)"><b>${x}</b><small>${RXS[x]}</small></button>`).join("")}
+      <div class="bk-row">${Object.keys(RX).map(x=>`<button class="rxb ${it.rx===x?'on':''}" data-k="${x}" onclick="bulkRx('${k}','${x}',this)"><b>${x}</b><small>${RXS[x]}</small></button>`).join("")}
         <input class="note" type="text" maxlength="160" placeholder="1줄 기록 (선택)" value="${esc(it.note||"")}" oninput="bulkNote('${k}',this.value)"></div>
       <details><summary>문제 보기</summary><img loading="lazy" src="data/${p.r}/img/q${String(p.n).padStart(2,"0")}.jpg" alt="${p.r}회 ${p.n}번 문제"></details></div>`;
   }).join("");
@@ -563,17 +555,17 @@ function exportText(s){
   L.push(`시대별 정답률: ` + ERAS.filter(e=>st.era[e]).map(e=>`${e} ${st.era[e].r}/${st.era[e].t}`).join(", "));
   const rk=Object.keys(st.rnd).map(Number).sort((a,b)=>a-b);
   if(rk.length>1) L.push(`회차별 정답률: ` + rk.map(r=>`${r}회 ${st.rnd[r].r}/${st.rnd[r].t}`).join(", "));
-  // 행 양식은 회차 기록과 같다. 그냥 풀기에서 반응을 고르지 않은 문항은 "-" 로 표시한다.
+  // 행 양식은 회차 기록과 같다. 반응을 고르지 않은 문항은 "-" 로 표시한다.
   const row = (x,k) => { const it=s.items[k]||{}, p=BY[k]; return `${x} | ${k} / ${p.e} / 내 답 ${it.pick?CIR[it.pick]:"미응답"}·정답 ${CIR[p.a]} / ${(it.note||"").trim()||"(기록 없음)"}`; };
   const rx = k => (s.items[k]||{}).rx;
-  const rows = x => st.list.filter(k=>rx(k)===x).map(k=>row(x,k));
-  const unrxWrong = check ? [] : st.list.filter(k=>!rx(k) && !isRightIn(s,k)).map(k=>row("-",k));
-  const wrong=[...rows("C"),...rows("D"),...unrxWrong], confused=rows("B");
+  // 반응은 정오와 상관없이 고를 수 있으므로 구역은 정오로 나눈다 (2026-11-24)
+  const rows = (x,ok) => st.list.filter(k=>isRightIn(s,k)===ok && (rx(k)||"-")===x).map(k=>row(x,k));
+  const wrong=["C","D","A","B","-"].flatMap(x=>rows(x,false)), confused=rows("B",true);
   // 풀이 문항 (2026-11-11): 출제 순서대로 회차-번호 / 시대 / 주제 / O·X / 반응
   L.push(""); L.push("[풀이 문항]"); L.push(...st.list.map(k=>`${k} / ${BY[k].e} / ${BY[k].k||"주제 미등록"} / ${isRightIn(s,k)?"O":"X"} / ${rx(k)||"-"}`));
   L.push(""); L.push("[오답 1줄 기록]"); L.push(...(wrong.length?wrong:["없음"]));
   L.push(""); L.push("[헷갈렸는데 맞은 문항]"); L.push(...(confused.length?confused:["없음"]));
-  const memo = st.list.filter(k=>{const it=s.items[k]||{}; return (it.rx==="A" || (!check && !it.rx && isRightIn(s,k))) && (it.note||"").trim();})
+  const memo = st.list.filter(k=>{const it=s.items[k]||{}; return isRightIn(s,k) && it.rx!=="B" && (it.note||"").trim();})
     .map(k=>`${s.items[k].rx||"-"} | ${k} / ${BY[k].e} / ${s.items[k].note.trim()}`);
   if(memo.length){ L.push(""); L.push("[메모]"); L.push(...memo); }
   const unrx = st.list.filter(k=>!rx(k));
