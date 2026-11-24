@@ -155,24 +155,9 @@ footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-soft);pa
   .rxb small{font-size:10.5px;white-space:normal;word-break:keep-all;display:inline-block;line-height:1.25}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-/* 해설 출력 (2026-11-24) */
-.xopts{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;margin-bottom:12px}
-.xopts label{display:flex;gap:6px;align-items:center;cursor:pointer}
-.xp{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px}
-.xp-h{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--ink-soft);margin-bottom:6px}
-.xp-h b{font-size:15px;color:var(--accent)}
-.xp-h .ans{color:var(--correct);font-weight:700}
-.xp img{width:100%;height:auto;display:block;background:#fff;border-radius:6px;margin-bottom:8px}
-@media print{
-  html,body{background:#fff;min-height:0}
-  .wrap{max-width:none;padding:0}
-  .noprint,.toast{display:none!important}
-  header{background:none;color:#000;box-shadow:none;border-radius:0;border-bottom:2px solid #000;padding:0 0 8px;margin-bottom:12px}
-  header .badge{border:0;padding:0;margin:0}
-  .xp{break-inside:avoid;box-shadow:none;border-color:#bbb;background:#fff}
-  .xp img{max-height:95mm;width:auto;max-width:100%}
-  .xp-h,.xp-h b,.xp-h .ans{color:#000}
-}
+/* 해설 텍스트 (2026-11-24) */
+.xopts{display:flex;gap:6px;align-items:center;font-size:14px;margin-bottom:12px;cursor:pointer}
+textarea.out.exps{min-height:60vh;white-space:pre-wrap;line-height:1.6}
 </style>
 </head>
 <body>
@@ -279,7 +264,7 @@ function renderHome(){
   h += done.length ? recordsTable(done) : `<p class="muted">아직 끝낸 기록이 없습니다. 위에서 연습이나 실전을 시작하세요.</p>`;
   const nExp = P.filter(p=>expOf(p.n).trim()).length;
   h += `<h2>이 회차 해설</h2><p class="muted" style="margin-bottom:8px">해설이 있는 문항 ${nExp} / ${P.length}. 정답이 함께 나오므로 풀기 전에는 열지 마세요.</p>
-    <div class="btnrow"><button class="btn" onclick="renderExps()">해설 보기·인쇄</button></div>`;
+    <div class="btnrow"><button class="btn" onclick="renderExps()">해설 텍스트 보기·복사</button></div>`;
   h += `<h2>백업</h2><p class="muted" style="margin-bottom:8px">기록은 이 기기의 이 브라우저에만 저장됩니다. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 백업하세요.</p>
     <div class="btnrow"><button class="btn" onclick="backup()">백업 파일 받기</button><button class="btn" onclick="$('#restore').click()">백업 불러오기</button>
     <input type="file" id="restore" accept=".json" style="display:none" onchange="restore(this)"></div>`;
@@ -364,10 +349,9 @@ function renderQuiz(keep, after){
 }
 function panel(n){
   const p=BY[n], it=S.items[n]||{}, ok=isRight(n);
-  const allowed = ok ? ["A","B"] : ["C","D"];
   const verdict = ok ? `<div class="verdict ok">✓ 정답입니다!<span>(배점 ${p.p}점)</span></div>`
     : `<div class="verdict no">✗ ${it.pick?"오답입니다.":"미응답입니다."}<span>정답은 ${CIR[p.a]}번입니다.</span></div>`;
-  const rx = Object.keys(RX).map(k=>`<button class="rxb ${it.rx===k?'on':''}" data-k="${k}" ${allowed.includes(k)?"":"disabled"} onclick="setRx(${n},'${k}')"><b>${k}</b><small>${RXS[k]}</small></button>`).join("");
+  const rx = Object.keys(RX).map(k=>`<button class="rxb ${it.rx===k?'on':''}" data-k="${k}" onclick="setRx(${n},'${k}')"><b>${k}</b><small>${RXS[k]}</small></button>`).join("");
   const my = it.pick ? CIR[it.pick] : "미응답";
   const label = it.rx==="D" ? "정답 선지의 핵심 키워드" : "두 선지를 구분하는 근거";
   const ph = it.rx==="D" ? "예: 광평성 → 궁예(태봉)의 정치 기구" : it.rx==="A" ? "남길 메모가 있으면 적으세요 (생략 가능)" : "예: 원종·애노의 난은 진성여왕 때, 김헌창의 난은 헌덕왕 때";
@@ -442,7 +426,7 @@ document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA") return;
   const n=qList()[qCur()];
   if(/^[1-5]$/.test(e.key) && !graded(n)) pick(n,+e.key);
-  else if(/^[abcdABCD]$/.test(e.key) && graded(n)){ const k=e.key.toUpperCase(); const ok=isRight(n); if((ok&&"AB".includes(k))||(!ok&&"CD".includes(k))) setRx(n,k); }
+  else if(/^[abcdABCD]$/.test(e.key) && graded(n)){ const k=e.key.toUpperCase(); setRx(n,k); }
   else if(e.key==="ArrowRight"){ if(EDIT||S.mode!=="practice"||graded(n)) go(1); }
   else if(e.key==="ArrowLeft") go(-1);
 });
@@ -462,31 +446,25 @@ function stats(s){
   return {list,got,max,right,rx,era,pending};
 }
 
-/* ---------- 화면: 해설 출력 (2026-11-24) ---------- */
-/* 이 회차의 해설을 번호순으로 모아 보고 인쇄(PDF 저장)한다. 화면에서 작성한 반영 전 해설도 expOf() 로 포함된다. */
-let XO = {all:false, img:false};
+/* ---------- 화면: 해설 텍스트 (2026-11-24) ---------- */
+/* 이 회차 해설을 기록처럼 복사할 수 있는 텍스트로 보여 준다. 화면에서 작성한 반영 전 해설도 expOf() 로 포함된다. */
+let XMINE = false;      // true: 화면에서 작성한(반영 전) 해설만
+function expText(mine){
+  const list = P.filter(p=>expOf(p.n).trim() && (!mine || isMine(p.n)));
+  if(!list.length) return "";
+  return [`[한능검 해설] 제${ROUND}회 ${list.length}문항${mine?" (반영 전)":""}`]
+    .concat(list.map(p=>`${ROUND}-${p.n} / ${p.e} / ${p.k||"주제 미등록"} / 정답 ${CIR[p.a]}\n${expOf(p.n).trim()}`)).join("\n\n");
+}
 function renderExps(){
   view="exps"; EDIT=null;
-  const has = P.filter(p=>expOf(p.n).trim()), list = XO.all ? P : has;
-  let h = `<div class="bar noprint"><div class="left"><button class="btn ghost" onclick="renderHome()">← 처음으로</button></div>
-    <div class="right"><button class="btn primary" style="padding:6px 12px;border-radius:6px" id="printBtn" ${list.length?"":"disabled"} onclick="printExps()">인쇄 / PDF 저장</button></div></div>`;
-  h += `<header><span class="badge">${EXAM_DATE}</span><h1>제${ROUND}회 해설</h1><div class="subtitle">심화 · 해설 ${has.length}문항</div></header>`;
-  h += `<div class="xopts noprint"><label><input type="checkbox" id="xAll" ${XO.all?"checked":""} onchange="XO.all=this.checked;renderExps()">해설 없는 문항도 보기</label>
-    <label><input type="checkbox" id="xImg" ${XO.img?"checked":""} onchange="XO.img=this.checked;renderExps()">문제 이미지 포함</label></div>`;
-  if(!list.length) h += `<p class="muted">이 회차에는 정리된 해설이 없습니다. 풀이 화면에서 작성하면 여기에 모입니다.</p>`;
-  h += list.map(p=>{
-    const x=expOf(p.n).trim();
-    return `<div class="xp"><div class="xp-h"><b>${p.n}번</b><span>${p.e}${p.k?" · "+esc(p.k):""}</span><span>${p.p}점</span><span class="ans">정답 ${CIR[p.a]}</span>${isMine(p.n)?`<span class="exp-mine noprint">작성함 · 반영 전</span>`:""}</div>
-      ${XO.img?`<img src="data/${ROUND}/img/q${String(p.n).padStart(2,"0")}.jpg" alt="${ROUND}회 ${p.n}번 문제">`:""}
-      ${x?`<div class="exp">${esc(x)}</div>`:`<div class="exp none">해설 없음</div>`}</div>`;
-  }).join("");
+  const txt = expText(XMINE);
+  let h = `<div class="bar"><div class="left"><button class="btn ghost" onclick="renderHome()">← 처음으로</button></div></div>` + mast();
+  h += `<h2>제${ROUND}회 해설</h2><p class="muted" style="margin-bottom:8px">아래 내용을 복사해서 쓰세요. 정답이 함께 나옵니다.</p>
+    <label class="xopts"><input type="checkbox" id="xMine" ${XMINE?"checked":""} onchange="XMINE=this.checked;renderExps()">화면에서 작성한 해설(반영 전)만</label>`;
+  h += txt ? `<textarea class="out exps" id="out" readonly>${esc(txt)}</textarea>
+    <div class="nav"><button class="btn" onclick="renderHome()">처음으로</button><button class="btn primary" id="expCopy" onclick="copyOut()">해설 복사</button></div>`
+    : `<p class="muted">${XMINE?"이 회차에는 반영 전 해설이 없습니다.":"이 회차에는 정리된 해설이 없습니다. 풀이 화면에서 작성하면 여기에 나옵니다."}</p>`;
   $("#app").innerHTML=h; window.scrollTo(0,0);
-}
-async function printExps(){          // 이미지가 다 뜬 뒤에 인쇄한다 (덜 뜬 채 인쇄하면 빈칸)
-  const b=$("#printBtn"); if(b) b.disabled=true;
-  await Promise.all([...document.querySelectorAll(".xp img")].map(i=>i.complete?null:new Promise(r=>{ i.onload=i.onerror=r; })));
-  if(b) b.disabled=false;
-  if(view==="exps") window.print();
 }
 
 /* ---------- 화면: 결과 ---------- */
@@ -522,17 +500,17 @@ function exportText(s){
   L.push(`점수: ${st.got}/${st.max}점 (정답 ${st.right}/${st.list.length}문항)`);
   L.push(`문항 반응: A ${st.rx.A} / B ${st.rx.B} / C ${st.rx.C} / D ${st.rx.D}${st.pending?` / 미분류·미기록 ${st.pending}`:""}`);
   L.push(`시대별 정답률: ` + ERAS.filter(e=>st.era[e]).map(e=>`${e} ${st.era[e].r}/${st.era[e].t}`).join(", "));
-  // 반응을 고르지 않은 오답·메모는 "-" 로 싣는다 (2026-11-24, 시대별 화면과 같은 형식)
-  const rows = k => st.list.filter(n=>{ const it=s.items[n]||{}; return k==="-" ? !it.rx && it.pick!==BY[n].a : it.rx===k; }).map(n=>{
+  // 반응은 정오와 상관없이 고를 수 있으므로 구역은 정오로 나눈다. 반응 없는 문항은 "-" (2026-11-24, 시대별 화면과 같은 형식)
+  const rows = (k,ok) => st.list.filter(n=>{ const it=s.items[n]||{}; return (it.pick===BY[n].a)===ok && (it.rx||"-")===k; }).map(n=>{
     const it=s.items[n]||{}, p=BY[n];
     return `${k} | ${s.round}-${n} / ${p.e} / 내 답 ${it.pick?CIR[it.pick]:"미응답"}·정답 ${CIR[p.a]} / ${(it.note||"").trim()||"(기록 없음)"}`;
   });
-  const wrong=[...rows("C"),...rows("D"),...rows("-")], confused=rows("B");
+  const wrong=["C","D","A","B","-"].flatMap(k=>rows(k,false)), confused=rows("B",true);
   // 풀이 문항 (2026-11-11): 출제 순서대로 회차-번호 / 시대 / 주제 / O·X / 반응 (시대별 화면과 같은 형식)
   L.push(""); L.push("[풀이 문항]"); L.push(...st.list.map(n=>{ const it=s.items[n]||{}, p=BY[n]; return `${s.round}-${n} / ${p.e} / ${p.k||"주제 미등록"} / ${it.pick===p.a?"O":"X"} / ${it.rx||"-"}`; }));
   L.push(""); L.push("[오답 1줄 기록]"); L.push(...(wrong.length?wrong:["없음"]));
   L.push(""); L.push("[헷갈렸는데 맞은 문항]"); L.push(...(confused.length?confused:["없음"]));
-  const memo = st.list.filter(n=>{const it=s.items[n]||{}; return (it.rx==="A" || (!it.rx && it.pick===BY[n].a)) && (it.note||"").trim();}).map(n=>`${s.items[n].rx||"-"} | ${s.round}-${n} / ${BY[n].e} / ${s.items[n].note.trim()}`);
+  const memo = st.list.filter(n=>{const it=s.items[n]||{}; return it.pick===BY[n].a && it.rx!=="B" && (it.note||"").trim();}).map(n=>`${s.items[n].rx||"-"} | ${s.round}-${n} / ${BY[n].e} / ${s.items[n].note.trim()}`);
   if(memo.length){ L.push(""); L.push("[메모]"); L.push(...memo); }
   const unrx = st.list.filter(n=>!(s.items[n]||{}).rx);
   if(unrx.length){ L.push(""); L.push(`[반응 미분류] ` + unrx.map(n=>`${s.round}-${n}`).join(", ")); }

@@ -1,5 +1,5 @@
 """
-run_tests.py  (ver5.6 - 2026.11.24, 해설 출력·반응 필수 해제 검사 추가)
+run_tests.py  (ver5.6 - 2026.11.24, 해설 텍스트·반응 필수/제한 해제 검사 추가)
 dist/ 웹앱을 실제 브라우저(Chromium)로 열어 핵심 흐름을 검사한다.
 빌드 후, 템플릿이나 build.py 를 고친 뒤에 실행한다.
 
@@ -120,7 +120,7 @@ async def main():
         await pg.wait_for_timeout(300)
         check("연습: 답 선택 후 맨 위로 튀지 않음", await pg.evaluate("window.scrollY") > 0)
         await pg.set_viewport_size({"width": 420, "height": 900})
-        check("정답 선택 시 A·B만 활성", await pg.is_enabled('.rxb[data-k="B"]') and await pg.is_disabled('.rxb[data-k="C"]'))
+        check("정답이어도 A~D 모두 선택 가능 (2026-11-24 제한 해제)", await pg.locator(".rxb:enabled").count() == 4)
         # 반응 필수 해제 (2026-11-24)
         check("연습: 반응 없이 다음 가능", await pg.is_enabled("#nextBtn"))
         check("연습: 반응 없이 1줄 기록 입력 가능", await pg.is_enabled("#note"))
@@ -139,8 +139,11 @@ async def main():
         await pg.click("#nextBtn")
         ans2 = await pg.evaluate("ROUND_DATA.problems[1].a")
         await pg.click(f".bub >> nth={ans2 % 5}")                 # 일부러 오답
-        check("오답 선택 시 C·D만 활성", await pg.is_enabled('.rxb[data-k="C"]') and await pg.is_disabled('.rxb[data-k="A"]'))
-        await pg.click('.rxb[data-k="A"]', force=True)
+        check("오답이어도 A~D 모두 선택 가능", await pg.locator(".rxb:enabled").count() == 4)
+        await pg.click('.rxb[data-k="A"]')
+        check("오답에 A 선택됨", await pg.evaluate("S.items[2].rx") == "A")
+        await pg.keyboard.press("b")
+        check("오답에 키보드로 B 선택됨", await pg.evaluate("S.items[2].rx") == "B")
         await pg.click('.rxb[data-k="D"]')
         await pg.fill("#note", "핵심 키워드")
         await pg.click("text=그만하기")
@@ -155,7 +158,7 @@ async def main():
         check("기록 수정: 답 버튼 잠김", await pg.locator(".bub:enabled").count() == 0)
         check("기록 수정: 푼 문항만 이동", "1 / 2" in await pg.inner_text(".progress-text"))
         await pg.click("#nextBtn")
-        check("기록 수정: 오답은 C·D만 활성", await pg.is_enabled('.rxb[data-k="C"]') and await pg.is_disabled('.rxb[data-k="B"]'))
+        check("기록 수정: A~D 모두 선택 가능", await pg.locator(".rxb:enabled").count() == 4)
         await pg.click('.rxb[data-k="C"]')
         await pg.fill("#note", "수정한 근거")
         await pg.click("#nextBtn")                                  # 마지막 문항 → 수정 마치기
@@ -170,6 +173,11 @@ async def main():
         sec2 = out2[out2.index("[오답 1줄 기록]"):]
         check("반응 없는 오답·메모도 기록 텍스트에 나옴", "- | " in sec2.split("[메모]")[0] and "수정한 근거" in sec2.split("[메모]")[0]
               and "테스트 근거" in sec2.split("[메모]")[1], out2)
+        # 3-1c. 반응과 정오가 어긋나도 구역은 정오로 나뉜다: 정답+C(메모)는 [메모], 오답+B 는 [오답 1줄 기록]
+        out3 = await pg.evaluate("(()=>{const s=JSON.parse(JSON.stringify(ALL[0]));s.items[1].rx='C';s.items[2].rx='B';return exportText(s);})()")
+        wr, rest = out3[out3.index("[오답 1줄 기록]"):].split("[헷갈렸는데 맞은 문항]")
+        check("반응과 정오가 달라도 오답·정답 구역 유지", "B | " in wr and "C | " not in wr and "없음" in rest.split("[메모]")[0]
+              and "C | " in rest.split("[메모]")[1], out3)
         # 3-2. 해설 파일 받기
         await pg.click("text=처음으로")
         await explanation_tests(pg)
@@ -223,23 +231,24 @@ async def main():
 
 
 async def explanation_tests(pg):
-    """회차별 해설 출력 (2026-11-24): 해설 있는 문항만 / 전체, 문제 이미지 포함, 인쇄. 끝나면 회차 홈으로 돌아온다."""
+    """회차별 해설 텍스트 (2026-11-24): 기록처럼 복사할 수 있는 텍스트. 끝나면 회차 홈으로 돌아온다."""
     n_exp = await pg.evaluate("P.filter(p=>expOf(p.n).trim()).length")
-    await pg.click("text=해설 보기·인쇄")
-    check("해설 출력: 해설 있는 문항만 표시", n_exp > 0 and await pg.locator(".xp").count() == n_exp, f"{n_exp}")
-    check("해설 출력: 화면에서 작성한 해설 포함", "테스트 해설" in await pg.inner_text("#app") and "정답 " in await pg.inner_text(".xp"))
-    await pg.check("#xAll")
-    check("해설 출력: 전체 50문항 표시", await pg.locator(".xp").count() == 50)
-    await pg.check("#xImg")
-    await pg.evaluate("window.__printed=0; window.print=()=>{ window.__printed=[...document.querySelectorAll('.xp img')].filter(i=>i.complete&&i.naturalWidth>0).length; }")
-    await pg.click("#printBtn")
-    await pg.wait_for_function("window.__printed>0", timeout=15000)
-    check("해설 출력: 이미지가 다 뜬 뒤 인쇄", await pg.evaluate("window.__printed") == 50)
-    await pg.emulate_media(media="print")
-    check("해설 출력: 인쇄물에 버튼·옵션 없음", await pg.locator(".noprint:visible").count() == 0 and await pg.locator(".xp:visible").count() == 50)
-    await pg.emulate_media(media="screen")
-    await pg.click("text=처음으로")
-    check("해설 출력 → 회차 홈 복귀", await pg.locator(".mode").count() == 2)
+    await pg.click("text=해설 텍스트 보기·복사")
+    out = await pg.input_value("#out")
+    heads = [x for x in out.splitlines() if " / 정답 " in x]
+    check("해설 텍스트: 첫 줄에 회차·문항 수", out.splitlines()[0] == f"[한능검 해설] 제{await pg.evaluate('ROUND')}회 {n_exp}문항", out[:100])
+    check("해설 텍스트: 해설 있는 문항 모두", n_exp > 0 and len(heads) == n_exp, f"{len(heads)}/{n_exp}")
+    check("해설 텍스트: 화면에서 작성한 해설 본문 포함", "테스트 해설" in out and "둘째 줄" in out)
+    await pg.evaluate("window.__c=''; document.execCommand=()=>{ window.__c=document.querySelector('#out').value; return true; }; Object.defineProperty(navigator,'clipboard',{value:{writeText:t=>{ window.__c=t; return Promise.resolve(); }},configurable:true})")
+    await pg.click("#expCopy")
+    await pg.wait_for_timeout(200)
+    check("해설 텍스트: 복사 버튼이 전체 텍스트 복사", await pg.evaluate("window.__c") == out)
+    await pg.check("#xMine")
+    out = await pg.input_value("#out")
+    check("해설 텍스트: 작성한 해설만 보기", "(반영 전)" in out.splitlines()[0] and sum(" / 정답 " in x for x in out.splitlines()) == 1, out[:200])
+    await pg.uncheck("#xMine")
+    await pg.click(".nav >> text=처음으로")
+    check("해설 텍스트 → 회차 홈 복귀", await pg.locator(".mode").count() == 2)
 
 
 async def era_tests(b, pg):
@@ -280,6 +289,8 @@ async def era_tests(b, pg):
     check("그냥 풀기: 반응 없는 오답·메모 기록", "- | " in out and "오답 근거" in out and "그냥 메모" in out, out)
     # 한번에 기록 (2026-10-14): 결과 화면에서 푼 문항 전체의 반응·1줄 기록을 바로 저장
     check("한번에 기록 목록", await pg.locator(".bk").count() == 2)
+    check("한번에 기록: A~D 모두 선택 가능", await pg.locator(".bk .rxb:enabled").count() == 8)
+    check("한번에 기록: 가로 넘침 없음", await pg.evaluate("document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll('.bk .rxb')].every(x=>x.scrollWidth<=x.clientWidth)"))
     k2 = await pg.evaluate("BK.list[1]")
     await pg.click(f'.bk[data-k="{k2}"] .rxb[data-k="D"]')
     await pg.fill(f'.bk[data-k="{k2}"] .note', "한번에 쓴 키워드")
