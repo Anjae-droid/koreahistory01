@@ -1,5 +1,5 @@
 """
-run_tests.py  (ver5.5 - 2026.11.11, 기록 텍스트 [풀이 문항] 섹션 검사 추가)
+run_tests.py  (ver5.6 - 2026.11.24, 해설 출력·반응 필수 해제 검사 추가)
 dist/ 웹앱을 실제 브라우저(Chromium)로 열어 핵심 흐름을 검사한다.
 빌드 후, 템플릿이나 build.py 를 고친 뒤에 실행한다.
 
@@ -121,6 +121,10 @@ async def main():
         check("연습: 답 선택 후 맨 위로 튀지 않음", await pg.evaluate("window.scrollY") > 0)
         await pg.set_viewport_size({"width": 420, "height": 900})
         check("정답 선택 시 A·B만 활성", await pg.is_enabled('.rxb[data-k="B"]') and await pg.is_disabled('.rxb[data-k="C"]'))
+        # 반응 필수 해제 (2026-11-24)
+        check("연습: 반응 없이 다음 가능", await pg.is_enabled("#nextBtn"))
+        check("연습: 반응 없이 1줄 기록 입력 가능", await pg.is_enabled("#note"))
+        check("C 이름은 '헷갈려서 틀림'", "헷갈려서 틀림" in await pg.inner_text('.rxb[data-k="C"]') and await pg.evaluate("RX.C") == "헷갈려서 틀림")
         await pg.click('.rxb[data-k="B"]')
         check("B 선택 후 1줄 기록 없이도 다음 가능 (2026-10-14 필수 해제)", await pg.is_enabled("#nextBtn"))
         await pg.fill("#note", "테스트 근거")
@@ -161,8 +165,14 @@ async def main():
         sess = await pg.evaluate("JSON.parse(localStorage.getItem('hkh.sessions.v1'))")
         check("수정한 기록 저장(updatedAt)", any(x.get("finished") and x.get("updatedAt") and x["items"]["2"]["rx"] == "C" for x in sess))
 
+        # 3-1b. 반응 없는 기록 텍스트 (2026-11-24): 오답은 "- |" 로 [오답 1줄 기록], 메모 단 정답은 [메모]
+        out2 = await pg.evaluate("(()=>{const s=JSON.parse(JSON.stringify(ALL[0]));delete s.items[1].rx;delete s.items[2].rx;return exportText(s);})()")
+        sec2 = out2[out2.index("[오답 1줄 기록]"):]
+        check("반응 없는 오답·메모도 기록 텍스트에 나옴", "- | " in sec2.split("[메모]")[0] and "수정한 근거" in sec2.split("[메모]")[0]
+              and "테스트 근거" in sec2.split("[메모]")[1], out2)
         # 3-2. 해설 파일 받기
         await pg.click("text=처음으로")
+        await explanation_tests(pg)
         check("홈에 반영 전 해설 개수", "반영 전 해설 1개" in await pg.inner_text("#app"))
         async with pg.expect_download() as dl:
             await pg.click("text=해설 파일 받기")
@@ -210,6 +220,26 @@ async def main():
         await b.close()
     print(f"\n{sum(results)}/{len(results)} 통과")
     return 0 if all(results) else 1
+
+
+async def explanation_tests(pg):
+    """회차별 해설 출력 (2026-11-24): 해설 있는 문항만 / 전체, 문제 이미지 포함, 인쇄. 끝나면 회차 홈으로 돌아온다."""
+    n_exp = await pg.evaluate("P.filter(p=>expOf(p.n).trim()).length")
+    await pg.click("text=해설 보기·인쇄")
+    check("해설 출력: 해설 있는 문항만 표시", n_exp > 0 and await pg.locator(".xp").count() == n_exp, f"{n_exp}")
+    check("해설 출력: 화면에서 작성한 해설 포함", "테스트 해설" in await pg.inner_text("#app") and "정답 " in await pg.inner_text(".xp"))
+    await pg.check("#xAll")
+    check("해설 출력: 전체 50문항 표시", await pg.locator(".xp").count() == 50)
+    await pg.check("#xImg")
+    await pg.evaluate("window.__printed=0; window.print=()=>{ window.__printed=[...document.querySelectorAll('.xp img')].filter(i=>i.complete&&i.naturalWidth>0).length; }")
+    await pg.click("#printBtn")
+    await pg.wait_for_function("window.__printed>0", timeout=15000)
+    check("해설 출력: 이미지가 다 뜬 뒤 인쇄", await pg.evaluate("window.__printed") == 50)
+    await pg.emulate_media(media="print")
+    check("해설 출력: 인쇄물에 버튼·옵션 없음", await pg.locator(".noprint:visible").count() == 0 and await pg.locator(".xp:visible").count() == 50)
+    await pg.emulate_media(media="screen")
+    await pg.click("text=처음으로")
+    check("해설 출력 → 회차 홈 복귀", await pg.locator(".mode").count() == 2)
 
 
 async def era_tests(b, pg):
@@ -262,7 +292,7 @@ async def era_tests(b, pg):
     check("한번에 기록: 같은 반응 다시 누르면 해제", f"D | {k2}" not in await pg.input_value("#out"))
     sess = await pg.evaluate("JSON.parse(localStorage.getItem('hkh.sessions.v1')).filter(x=>x.kind==='era')")
     check("시대별 기록 저장", len(sess) == 1 and sess[0]["finished"])
-    # 항목체크 풀기: 전체 회차·무작위·최대 5문항, 반응·1줄 기록 필수
+    # 항목체크 풀기: 전체 회차·무작위·최대 5문항 (반응·1줄 기록 모두 선택, 2026-11-24)
     await pg.click("text=처음으로")
     await pg.select_option("#scope", "all")
     await pg.select_option("#order", "rand")
@@ -277,12 +307,12 @@ async def era_tests(b, pg):
     y1 = await pg.evaluate("window.scrollY")
     a = await pg.evaluate("BY[S.list[0]].a")
     await pg.click(f".bub >> nth={a % 5}")                      # 일부러 오답
-    check("항목체크: 반응 전 다음 막힘", await pg.is_disabled("#nextBtn"))
+    check("항목체크: 반응 없이 다음 가능", await pg.is_enabled("#nextBtn") and await pg.is_enabled("#note"))
     await pg.click('.rxb[data-k="C"]')
     y2 = await pg.evaluate("window.scrollY")
     check("항목체크: 반응 선택 후 스크롤 유지", y1 > 0 and y2 > 0, f"전 {y1} / 후 {y2}")
     await pg.set_viewport_size({"width": 420, "height": 900})
-    check("항목체크: 반응만 고르면 다음 가능", await pg.is_enabled("#nextBtn"))
+    check("항목체크: 반응 골라도 다음 가능", await pg.is_enabled("#nextBtn"))
     await pg.fill("#note", "시대별 근거")
     await pg.reload()
     check("시대별 이어서 풀기 표시", await pg.locator("text=이어서 풀기").count() == 1)
