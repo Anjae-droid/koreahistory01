@@ -1,10 +1,56 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # 05. 웹앱 — 작업 규칙
 
 한국사능력검정시험(심화) 기출을 회차별로 풀고, 문항 반응(A~D)과 오답 1줄 기록을 남겨
 학습 코치 채팅에 붙여넣을 텍스트로 내보내는 로컬 웹앱.
 "무엇을 왜" 는 `한능검웹앱_기획.md`, 사용법은 `README_한능검웹앱.md` 에 있다.
 
-상위 `01. 프로그래밍/CLAUDE.md` 의 규칙을 그대로 따른다. 아래는 이 폴더에만 해당하는 규칙이다.
+이 폴더는 독립 저장소(GitHub **공개** `Anjae-droid/koreahistory01`)다. 상위 `01. 프로그래밍/` 은 Git 저장소가 아니고
+상위 `CLAUDE.md` 도 없다. 여러 프로젝트 공통의 폴더 규칙은 상위 `README.md` 에 있다.
+
+## 명령
+
+```
+pip install -r requirements.txt
+python src\build.py                    data/ → dist/ 전체 빌드 (웹앱_빌드.bat)
+python _test\run_tests.py              회귀 테스트 (약 1분, 빌드 뒤에 실행)
+python src\extract_pdf.py --only 81    inbox/ 의 81회 PDF 만 추출 (새시험지_추가.bat 은 전체 추출 + 빌드)
+python src\import_explanations.py      해설 반영 (해설_추가.bat 은 반영 + 빌드)
+```
+
+* 빌드 도구·린터·패키지 매니저 없음. 화면은 순수 HTML+JS, 파이썬은 추출·빌드·테스트만 한다.
+* `run_tests.py` 는 **dist/ 를 연다** — 템플릿·build.py·data 를 고쳤으면 먼저 빌드한다. 인자를 받지 않는 단일 스크립트라
+  테스트 하나만 골라 실행할 수 없다. `check(이름, 조건)` 을 순서대로 실행하고 하나라도 실패하면 종료 코드 1.
+  실패만 보려면 출력에서 `실패` 줄을 찾는다.
+* Playwright 전용 Chromium 이 없으면 Edge → Chrome 순으로 자동 대체된다.
+* 파이썬 출력이 한글이라 파일·파이프로 받을 때 깨지거나 멈추면 `PYTHONIOENCODING=utf-8` 을 준다.
+* `extract_pdf.py` 는 `inbox/` 바로 아래만 본다. 이미 처리한 회차를 다시 추출하려면 PDF 2개를 `inbox/done/` 에서 `inbox/` 로 옮긴다.
+* **`extract_pdf.py --force` 는 백업 없이 `문항.csv` 를 새로 쓴다** — 확정한 시대·해설이 사라지고 `주제` 칸 자체가 없어진다.
+  이미지만 다시 만들 때는 `--images-only` 를 쓴다.
+* 빌드가 검증하는 것: 번호 1~50, 배점 합 100, 정답 1~5, 시대 허용 목록, 이미지 존재. 하나라도 틀린 회차는 빠지고 종료 코드 1.
+
+## 구조 (한눈에)
+
+```
+inbox/*.pdf ─extract_pdf.py→ data/<회차>/문항.csv + img/ ─build.py→ dist/round_N.html + dist/data/N/data.js (window.ROUND_DATA)
+                                     ↑                             dist/era.html   + dist/data/all.js    (window.ALL_DATA)
+화면에서 쓴 해설 JSON ─import_explanations.py┘                       dist/index.html + dist/data/rounds.js (window.ROUNDS)
+```
+
+* `build.py` 는 템플릿의 `__ROUND__` 만 치환한다. 문항 데이터는 HTML 에 넣지 않고 `data.js` 로 분리한다.
+  문항 1개는 `{n 번호, a 정답, p 배점, e 시대, x 해설, k 주제(선택)}`, `all.js` 에는 `r 회차` 가 더 붙는다.
+* 화면은 전역 상태(`S` 현재 세션, `ALL` 전체 기록, `EDIT` 마친 기록 수정 중)를 바꾸고 `render*()` 로 `#app` 을 통째로 다시 그린다.
+* localStorage 키: `hkh.sessions.v1` 기록 / `hkh.exps.v1` 반영 전 해설 / `hkh.eraopt.v1`·`hkh.erasel.v1` 마지막 선택(편의용).
+  앞의 두 개는 사용자의 실제 학습 기록이므로 키 이름·구조를 바꾸면 기존 기록이 보이지 않는다.
+* **여러 파일에 같은 내용이 복사돼 있어 함께 고쳐야 하는 것**
+  - 시대 목록 `ERAS`: `build.py`, `template_round.html`, `template_era.html`, `template_index.html` 4곳 (+ `era_keywords.py` 분류 키)
+  - 판정·해설·통계·`exportText()`·백업: `template_round.html` ↔ `template_era.html`
+* 문항 키가 화면마다 다르다: 회차 화면은 번호(`12`), 시대별 화면은 `"회차-번호"`(`"79-12"`).
+* **`dist/` 도 커밋한다.** GitHub Pages 가 main 브랜치 루트를 그대로 배포하고(`index.html` → `dist/index.html` 이동),
+  별도 빌드 단계가 없다. 템플릿·data 를 고쳤으면 빌드한 `dist/` 를 같은 커밋에 넣는다. main 병합이 곧 공개 배포다.
 
 ## 1. 폴더 역할
 
@@ -18,7 +64,7 @@
 |`src/import_explanations.py`|화면에서 작성한 해설(JSON)·해설 PDF → `문항.csv` 해설 칸||
 |`src/era_keywords.py`|시대 자동 분류 키워드|분류가 틀리면 키워드만 조정|
 |`data/rounds.csv`|회차, 시행일|사람이 편집 가능|
-|`data/<회차>/문항.csv`|번호, 정답, 배점, 시대, 검토필요, 해설|사람이 엑셀로 편집 가능|
+|`data/<회차>/문항.csv`|번호, 정답, 배점, 시대, 검토필요, 해설, 주제(선택)|사람이 엑셀로 편집 가능|
 |`data/<회차>/img/qNN.jpg`|문항 이미지 (원본 PDF 에서만 추출)|교체만|
 |`dist/`|생성물. 브라우저로 여는 곳|**절대 직접 수정 금지**|
 |`inbox/`, `inbox/해설/`|새 PDF 투입구. 처리 후 `done/` 으로 이동||
@@ -28,6 +74,8 @@
 ## 2. 반드시 지킬 규칙
 
 * 파일을 고치기 전에 `_archive/verN_<날짜>/` 에 먼저 복사한다. `data/` 의 CSV 도 포함.
+  CLAUDE.md 는 `CLAUDE_archived.md` 로 이름을 바꿔 보관한다 (작업 규칙으로 자동 로드되지 않게).
+* main 에는 작업 브랜치 + PR 로 병합해 왔다(PR #1~#7). 병합이 끝난 브랜치에 이어서 커밋하지 말고 최신 main 에서 새로 딴다.
 * **지시하지 않은 것은 고치지 않는다.** 디자인 톤(베이지 배경·적갈색 헤더·둥근 카드)은
 사용자가 한 번 되돌리라고 한 이력이 있다 (ver1 → ver2). 지시 없이 바꾸지 않는다.
 * 디자인·기능 변경은 `src/template_*.html` 에서만 하고 `웹앱_빌드.bat` 으로 전 회차에 반영한다.
@@ -59,7 +107,7 @@
   결과 화면의 "한번에 기록"(2026-10-14)은 화면을 다시 그리지 않고 그 자리에서 저장·기록 텍스트 갱신만 한다(입력 중 스크롤 유지).
 * 기록 복사 [풀이 문항] (2026-11-11): [오답 1줄 기록] 바로 위, 출제 순서로 `회차-번호 / 시대 / 주제 / O·X / 반응(없으면 -)`. 회차·시대별 화면 공통.
   주제는 문항.csv 의 선택 칸 `주제` 에서 가져오고, 비어 있으면 `주제 미등록`. 임의로 생성·추측해 채우지 않는다.
-  65~80회 800문항 `주제` 는 2026-11-11 Claude 가 문항 이미지·PDF 텍스트를 보고 채웠다(사람 검토 전). 새 회차는 비어 있으니 같은 방식으로 채운다.
+  65~80회 800문항 `주제` 는 2026-11-11 Claude 가 문항 이미지·PDF 텍스트를 보고 채웠다(사람 검토 전). 새로 추출한 회차의 `문항.csv` 에는 `주제` 칸이 없으니 칸을 추가하고 같은 방식으로 채운다.
 * 시대별 기록은 같은 저장소(`hkh.sessions.v1`)에 `kind:"era"`, `eras:[…]`(10-13 기록은 `era` 하나만) 로 들어가며 문항 키는 `"회차-번호"`. 회차 화면은 `round` 가 없는 기록을 보지 않는다.
   회차 화면과 시대별 화면의 판정·해설·통계 코드는 복사본이다. 한쪽 규칙을 바꾸면 다른 쪽도 맞춘다.
 
